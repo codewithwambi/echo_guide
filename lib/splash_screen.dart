@@ -3,7 +3,8 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'onboarding_screen.dart'; // Replace with your actual next screen
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({Key? key}) : super(key: key);
+ const SplashScreen({super.key});
+
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
