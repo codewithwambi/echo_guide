@@ -43,3 +43,38 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+
+# Flutter build files
+build/
+
+.packages
+
+Generated.xcconfig
+
+# Android
+android/.gradle/
+android/app/debug
+android/app/release
+android/key.properties
+
+# iOS/macOS
+ios/Pods/
+macos/Pods/
+*.xcworkspace
+*.xcuserstate
+DerivedData/
+
+# VS Code/IDE settings
+.vscode/
+
+
+
+# Firebase configs
+google-services.json
+firebase_options.dart
+
+# Other
+
+*.lock
+
