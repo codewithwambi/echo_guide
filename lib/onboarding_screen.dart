@@ -3,7 +3,8 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'home_screen.dart'; // Replace with your actual main screen
 
 class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({Key? key}) : super(key: key);
+  const OnboardingScreen({super.key});
+
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
