@@ -3,8 +3,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'onboarding_screen.dart'; // Replace with your actual next screen
 
 class SplashScreen extends StatefulWidget {
- const SplashScreen({super.key});
-
+  const SplashScreen({super.key});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -23,11 +22,14 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _speakWelcome() async {
     await flutterTts.setLanguage("en-US");
     await flutterTts.setSpeechRate(0.5);
-    await flutterTts.speak("Welcome to EchoPath. Your voice-guided journey begins here.");
+    await flutterTts.speak(
+      "Welcome to EchoPath. Your voice-guided journey begins here.",
+    );
   }
 
   void _navigateToNext() {
     Future.delayed(const Duration(seconds: 4), () {
+      if (!mounted) return; // ✅ Prevents context errors
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const OnboardingScreen()),
@@ -43,8 +45,11 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Replace with your app logo
-            Icon(Icons.assistant_navigation, color: Colors.lightBlueAccent, size: 100),
+            Icon(
+              Icons.assistant_navigation,
+              color: Colors.lightBlueAccent,
+              size: 100,
+            ),
             const SizedBox(height: 20),
             const Text(
               'EchoPath',
