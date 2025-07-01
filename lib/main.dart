@@ -4,8 +4,8 @@ import 'firebase_options.dart';
 
 // Import screens
 import 'signup_screen.dart';
-import 'login_screen.dart'; // ✅ Make sure this file exists
-
+import 'signin_screen.dart';
+import 'guide_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
@@ -26,7 +26,7 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return const MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: LoginScreen(), // ✅ This is your login screen
+      home: SignInScreen(), // ✅ This is your login screen
     );
   }
 }

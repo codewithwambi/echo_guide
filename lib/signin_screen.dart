@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'signin_screen.dart';
-import 'guide_screen.dart'; // if you have a guide page to redirect after sign up
+import 'signup_screen.dart';
+import 'guide_screen.dart';
 
-class SignUpScreen extends StatefulWidget {
-  const SignUpScreen({Key? key}) : super(key: key);
+class SignInScreen extends StatefulWidget {
+  const SignInScreen({Key? key}) : super(key: key);
 
   @override
-  State<SignUpScreen> createState() => _SignUpScreenState();
+  State<SignInScreen> createState() => _SignInScreenState();
 }
 
-class _SignUpScreenState extends State<SignUpScreen> {
+class _SignInScreenState extends State<SignInScreen> {
   final _formKey = GlobalKey<FormState>();
-
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
@@ -23,33 +22,34 @@ class _SignUpScreenState extends State<SignUpScreen> {
     super.dispose();
   }
 
-  Future<void> _signUp() async {
+  Future<void> _signIn() async {
     if (_formKey.currentState!.validate()) {
       try {
-        await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        UserCredential userCredential = await FirebaseAuth.instance
+            .signInWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Account created successfully!')),
+          const SnackBar(content: Text("Sign in successful")),
         );
 
-        // Navigate to guide/home screen after signup
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const GuideScreen(routeId: 'echo1')),
+          MaterialPageRoute(
+            builder: (context) => const GuideScreen(routeId: 'echo1'),
+          ),
         );
       } on FirebaseAuthException catch (e) {
-        String errorMessage = 'Sign up failed';
-        if (e.code == 'email-already-in-use') {
-          errorMessage = 'Email already in use';
-        } else if (e.code == 'weak-password') {
-          errorMessage = 'Password should be at least 6 characters';
+        String message = "Sign in failed";
+        if (e.code == 'user-not-found') {
+          message = 'No user found for that email.';
+        } else if (e.code == 'wrong-password') {
+          message = 'Wrong password provided.';
         }
-
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMessage)),
+          SnackBar(content: Text(message)),
         );
       }
     }
@@ -58,7 +58,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Welcome to Echo Guide')),
+      appBar: AppBar(
+        title: const Text('Welcome to Echo Guide'),
+      ),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(20.0),
@@ -69,7 +71,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
               children: [
                 const SizedBox(height: 60),
                 const Text(
-                  'Sign Up',
+                  'Sign In',
                   style: TextStyle(
                     fontSize: 35,
                     color: Colors.teal,
@@ -87,7 +89,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     border: OutlineInputBorder(),
                   ),
                   validator: (value) =>
-                  value == null || value.isEmpty ? 'Please enter email' : null,
+                  value == null || value.isEmpty ? "Please enter email" : null,
                 ),
                 const SizedBox(height: 30),
                 TextFormField(
@@ -100,33 +102,25 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     border: OutlineInputBorder(),
                   ),
                   validator: (value) =>
-                  value == null || value.length < 6
-                      ? 'Password must be at least 6 characters'
-                      : null,
+                  value == null || value.isEmpty ? "Please enter password" : null,
                 ),
                 const SizedBox(height: 30),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 35),
-                  child: Column(
-                    children: [
-                      MaterialButton(
-                        onPressed: _signUp,
-                        child: const Text('Sign Up'),
-                        color: Colors.teal,
-                        textColor: Colors.white,
-                      ),
-                      const SizedBox(height: 15),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const SignInScreen()),
-                          );
-                        },
-                        child: const Text("Already have an account? Sign In"),
-                      ),
-                    ],
-                  ),
+                MaterialButton(
+                  onPressed: _signIn,
+                  child: const Text("Sign In"),
+                  color: Colors.teal,
+                  textColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                ),
+                const SizedBox(height: 20),
+                TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const SignUpScreen()),
+                    );
+                  },
+                  child: const Text("Don't have an account? Sign up"),
                 ),
               ],
             ),
