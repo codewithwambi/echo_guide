@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
-import 'home_screen.dart'; // Replace with your actual main screen
+import 'home_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
-
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
