@@ -11,7 +11,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'EchoPath',
+      title: 'EchoGuide',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark(),
       home: const SplashScreen(),
