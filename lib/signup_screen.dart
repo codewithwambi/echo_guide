@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'signin_screen.dart';
-import 'guide_screen.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -33,13 +32,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
         if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Account created successfully!')),
+          const SnackBar(content: Text('Account created successfully! Please sign in.')),
         );
 
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const GuideScreen(routeId: 'echo1'),
+            builder: (context) => const SignInScreen(),
           ),
         );
       } on FirebaseAuthException catch (e) {
@@ -116,6 +115,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         onPressed: _signUp,
                         color: Colors.teal,
                         textColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 40,
+                          vertical: 15,
+                        ),
                         child: const Text('Sign Up'),
                       ),
                       const SizedBox(height: 15),

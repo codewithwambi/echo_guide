@@ -15,12 +15,16 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
+    debugPrint("DEBUG: SplashScreen initState called");
 
     // Use post-frame callback to ensure context is safe
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      debugPrint("DEBUG: Starting 3 second delay in SplashScreen");
       Future.delayed(const Duration(seconds: 3), () {
+        debugPrint("DEBUG: 3 second delay finished in SplashScreen");
         if (!_navigated && mounted) {
           _navigated = true;
+          debugPrint("DEBUG: Navigating to OnboardingScreen from SplashScreen");
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => const OnboardingScreen()),
           );
@@ -31,6 +35,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint("DEBUG: SplashScreen build called");
     return const Scaffold(
       body: Center(
         child: Text(

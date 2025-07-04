@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:developer' as developer;
 
 import 'signup_screen.dart';
-import 'guide_screen.dart';
+import 'location_guidance_screen.dart'; // ✅ Still needed after sign-in
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -33,7 +33,6 @@ class _SignInScreenState extends State<SignInScreen> {
           password: _passwordController.text.trim(),
         );
 
-        // Use logging instead of print
         developer.log('Signed in user: ${userCredential.user?.email}');
 
         if (!mounted) return;
@@ -42,10 +41,11 @@ class _SignInScreenState extends State<SignInScreen> {
           const SnackBar(content: Text("Sign in successful")),
         );
 
+        // ✅ Navigate to LocationGuidanceScreen after successful login
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const GuideScreen(routeId: 'echo1'),
+            builder: (context) => const LocationGuidanceScreen(),
           ),
         );
       } on FirebaseAuthException catch (e) {
@@ -67,6 +67,8 @@ class _SignInScreenState extends State<SignInScreen> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint("DEBUG: SignInScreen build called"); // ✅ Log added
+
     return Scaffold(
       appBar: AppBar(title: const Text('Welcome to Echo Guide')),
       body: SingleChildScrollView(
