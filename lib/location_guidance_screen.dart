@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
-import 'login_guest_screen.dart';
+import 'map_screen.dart'; // New GPS-enabled map screen
 
 class LocationGuidanceScreen extends StatefulWidget {
   const LocationGuidanceScreen({super.key});
@@ -28,25 +28,21 @@ class _LocationGuidanceScreenState extends State<LocationGuidanceScreen> {
 
     if (available) {
       setState(() => _isListening = true);
-      _speech.listen(
-        onResult: (result) {
-          setState(() {
-            _recognizedText = result.recognizedWords.toLowerCase();
-          });
+      _speech.listen(onResult: (result) {
+        setState(() => _recognizedText = result.recognizedWords.toLowerCase());
 
-          if (_recognizedText.contains('continue') || _recognizedText.contains('next')) {
-            _speech.stop();
-            _goToLogin();
-          }
-        },
-      );
+        if (_recognizedText.contains('continue') || _recognizedText.contains('next')) {
+          _speech.stop();
+          _goToMap();
+        }
+      });
     }
   }
 
-  void _goToLogin() {
+  void _goToMap() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const LoginGuestScreen()),
+      MaterialPageRoute(builder: (context) => const MapScreen()),
     );
   }
 
@@ -75,13 +71,13 @@ class _LocationGuidanceScreenState extends State<LocationGuidanceScreen> {
               const SizedBox(height: 20),
               const Text(
                 'Location-Based Guidance',
-                style: TextStyle(fontSize: 26, color: Colors.white, fontWeight: FontWeight.bold),
+                style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 10),
               const Text(
-                'Say "continue" to proceed.',
-                style: TextStyle(fontSize: 16, color: Colors.white70),
+                'Say "continue" to view nearby sites.',
+                style: TextStyle(color: Colors.white70),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 40),
@@ -94,10 +90,7 @@ class _LocationGuidanceScreenState extends State<LocationGuidanceScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              Text(
-                _recognizedText,
-                style: const TextStyle(color: Colors.white54),
-              ),
+              Text(_recognizedText, style: const TextStyle(color: Colors.white54)),
             ],
           ),
         ),
