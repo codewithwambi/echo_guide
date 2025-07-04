@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_tts/flutter_tts.dart';
 import 'home_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -10,46 +9,38 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
-  final FlutterTts flutterTts = FlutterTts();
-
   @override
   void initState() {
     super.initState();
-    _startOnboardingVoice();
-  }
+    debugPrint("DEBUG: OnboardingScreen initState");
 
-  Future<void> _startOnboardingVoice() async {
-    await flutterTts.setLanguage("en-US");
-    await flutterTts.setSpeechRate(0.5);
-    await flutterTts.speak(
-      "Welcome to EchoPath. This app will guide you using your voice, location, and sound. "
-      "You can ask: 'What's near me?', or tap the screen to explore. Tap anywhere to continue."
-    );
-  }
-
-  void _goToHome() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const HomeScreen()),
-    );
+    // Auto-navigate to HomeScreen after 1 second
+    Future.delayed(const Duration(seconds: 1), () {
+      debugPrint("DEBUG: Auto navigating to HomeScreen");
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: _goToHome,
-      child: Scaffold(
-        backgroundColor: Colors.black,
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Text(
-              "👋 Welcome to EchoPath!\n\nTap anywhere to continue...",
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 22,
-                color: Colors.white,
-              ),
+    debugPrint("DEBUG: OnboardingScreen build");
+
+    return const Scaffold(
+      backgroundColor: Colors.black,
+      body: Center(
+        child: Padding(
+          padding: EdgeInsets.all(24.0),
+          child: Text(
+            "👋 Welcome to EchoPath!\n\nTap anywhere to continue...",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 22,
+              color: Colors.white,
             ),
           ),
         ),
