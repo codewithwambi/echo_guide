@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_tts/flutter_tts.dart';
-import 'onboarding_screen.dart'; // Replace with your actual next screen
+import 'dart:async';
+import 'onboarding_screen.dart'; // Replace with your actual home screen
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -10,65 +10,32 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  final FlutterTts flutterTts = FlutterTts();
+  bool _navigated = false;
 
   @override
   void initState() {
     super.initState();
-    _speakWelcome();
-    _navigateToNext();
-  }
 
-  Future<void> _speakWelcome() async {
-    await flutterTts.setLanguage("en-US");
-    await flutterTts.setSpeechRate(0.5);
-    await flutterTts.speak(
-      "Welcome to EchoPath. Your voice-guided journey begins here.",
-    );
-  }
-
-  void _navigateToNext() {
-    Future.delayed(const Duration(seconds: 4), () {
-      if (!mounted) return; // ✅ Prevents context errors
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const OnboardingScreen()),
-      );
+    // Use post-frame callback to ensure context is safe
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(seconds: 3), () {
+        if (!_navigated && mounted) {
+          _navigated = true;
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+          );
+        }
+      });
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
+    return const Scaffold(
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.assistant_navigation,
-              color: Colors.lightBlueAccent,
-              size: 100,
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'EchoPath',
-              style: TextStyle(
-                fontSize: 32,
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
-              ),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'Voice-powered tour guide',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.white70,
-              ),
-            ),
-          ],
+        child: Text(
+          'Welcome to Echo Guide',
+          style: TextStyle(fontSize: 24, color: Colors.white),
         ),
       ),
     );
