@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'splash_screen.dart'; // Ensure splash_screen.dart exists in lib/
 
+
 void main() {
   runApp(const MyApp());
 }
@@ -24,17 +25,19 @@ class MyApp extends StatelessWidget {
           labelLarge: TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
-      home: const SplashScreen(), // First screen the user sees
-      onUnknownRoute: (settings) => MaterialPageRoute(
-        builder: (context) => const Scaffold(
-          body: Center(
-            child: Text(
-              'Page not found',
-              style: TextStyle(color: Colors.white),
-            ),
+      home: SplashScreen(), // Removed 'const' here
+      onUnknownRoute:
+          (settings) => MaterialPageRoute(
+            builder:
+                (context) => const Scaffold(
+                  body: Center(
+                    child: Text(
+                      'Page not found',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ),
           ),
-        ),
-      ),
     );
   }
 }
