@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart'; // Import FlutterTts
 
-class HelpSupportScreen extends StatefulWidget {
+class HelpAndSupportScreen extends StatefulWidget {
   // It's good practice for public widgets to have a const constructor with a Key.
-  const HelpSupportScreen({super.key});
+  const HelpAndSupportScreen({super.key});
 
   @override
-  State<HelpSupportScreen> createState() => _HelpSupportScreenState();
+  State<HelpAndSupportScreen> createState() => _HelpAndSupportScreenState();
 }
 
-class _HelpSupportScreenState extends State<HelpSupportScreen> {
+class _HelpAndSupportScreenState extends State<HelpAndSupportScreen> {
   late FlutterTts tts; // Declare as late to initialize in initState
 
   @override
@@ -21,10 +21,12 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
 
   Future<void> _initAndSpeakHelpText() async {
     await tts.setLanguage("en-US");
+    // You might want to set other TTS parameters here, e.g., speed, pitch
+    // await tts.setSpeechRate(0.5);
+    // await tts.setPitch(1.0);
+
     // Ensure speech stops if the widget is unmounted quickly after this
-    // although for short phrases, it's less critical.
-    if (mounted) { // Good practice to check mounted before performing UI actions or
-                   // continuing async operations that depend on the widget being in the tree.
+    if (mounted) {
       await tts.speak(
           "Here are tips on using EchoPath. You can say things like 'What's near me?' or 'Start audio tour'");
     }
@@ -33,6 +35,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
   @override
   void dispose() {
     tts.stop(); // Stop any ongoing speech when the widget is disposed
+    // Removed: tts.shutdown(); // This method is not defined for FlutterTts
     super.dispose();
   }
 
@@ -45,10 +48,11 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
         title: const Text("Voice Help"), // Make title const
         backgroundColor: Colors.black, // Match Scaffold background
         foregroundColor: Colors.white, // Ensure back button and title are visible
+        elevation: 0, // AppBar typically looks better with no shadow on dark themes
       ),
-      body: Center(
+      body: const Center( // Can make Center const
         child: Column(
-          children: const [ // Make children const if all are const
+          children: [ // ListTiles are also const, so the whole column's children can be const
             ListTile(
               title: Text("Quick Tips", style: TextStyle(color: Colors.white)),
               subtitle: Text("Use voice to explore", style: TextStyle(color: Colors.grey)),
@@ -57,6 +61,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
               title: Text("FAQs", style: TextStyle(color: Colors.white)),
               subtitle: Text("How to use voice commands", style: TextStyle(color: Colors.grey)),
             ),
+            // You can add more ListTiles or other widgets here for additional content.
           ],
         ),
       ),

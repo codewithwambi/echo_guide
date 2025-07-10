@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
-import 'splash_screen.dart'; // Ensure splash_screen.dart exists in lib/
-
+import 'splash_screen.dart';
+import 'onboarding_screen.dart';
+import 'login_screen.dart';
+import 'home_screen.dart';
+import 'tour_discovery_screen.dart';
+import 'audio_guide_screen.dart';
+import 'downloads_screen.dart';
+import 'help_and_support_screen.dart';
 
 void main() {
   runApp(const MyApp());
-}
+} // Corrected: removed extra ')' and added missing '}' for the main function
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -25,19 +31,21 @@ class MyApp extends StatelessWidget {
           labelLarge: TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
-      home: SplashScreen(), // Removed 'const' here
-      onUnknownRoute:
-          (settings) => MaterialPageRoute(
-            builder:
-                (context) => const Scaffold(
-                  body: Center(
-                    child: Text(
-                      'Page not found',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ),
-                ),
-          ),
-    );
+
+      // Initial screen
+      home: const SplashScreen(),
+
+      // Named routes
+      routes: {
+        '/splash': (context) => const SplashScreen(),
+        '/onboarding': (context) => const OnboardingScreen(),
+        '/login': (context) => const LoginScreen(),
+        '/home': (context) => const HomeScreen(),
+        '/tour-discovery': (context) => const TourDiscoveryScreen(),
+        '/audio-guide': (context) => const AudioGuideScreen(),
+        '/downloads': (context) => const DownloadsScreen(),
+        '/help-support': (context) => const HelpAndSupportScreen(),
+      },
+    ); // Corrected: added missing ')' for the MaterialApp
   }
 }

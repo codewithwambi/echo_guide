@@ -116,7 +116,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Navigator.push(
                   context,
                   // --- FIX: Removed 'const' for HelpSupportScreen() ---
-                  MaterialPageRoute(builder: (_) => HelpSupportScreen()),
+                  MaterialPageRoute(builder: (_) => HelpAndSupportScreen()),
                 );
               },
               child: const Text("Voice Command Help"), // Added const for static Text
