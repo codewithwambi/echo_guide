@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "926115241361",
+    "project_id": "echo-guide-6a131",
+    "storage_bucket": "echo-guide-6a131.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:926115241361:android:1cbb823ff2529ad5530e30",
+        "android_client_info": {
+          "package_name": "com.example.echo_guide"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD1jKXANGdcHeHIfeDUsVx79hcKMI1aBB4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
