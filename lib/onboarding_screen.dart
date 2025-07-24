@@ -16,12 +16,20 @@ class OnboardingScreenState extends State<OnboardingScreen> {
   @override
   void initState() {
     super.initState();
-    tts = FlutterTts();
-    _initTts().then((_) => _speakTutorial());
 
-    // Fallback navigation in case user doesn't tap
-    Future.delayed(Duration(seconds: 8), () {
-      if (!_navigated && mounted) _goToLogin();
+    tts = FlutterTts();
+
+    // Initialize TTS and then speak tutorial
+    Future.microtask(() async {
+      await _initTts();
+      await _speakTutorial();
+    });
+
+    // Fallback auto navigation after 8 seconds
+    Future.delayed(const Duration(seconds: 8), () {
+      if (!_navigated && mounted) {
+        _goToLogin();
+      }
     });
   }
 
@@ -29,21 +37,29 @@ class OnboardingScreenState extends State<OnboardingScreen> {
     if (_navigated) return;
     _navigated = true;
 
+    // Ensure we stop TTS and only navigate after widget tree is built
     tts.stop();
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => LoginScreen()),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+    });
   }
 
   Future<void> _initTts() async {
     await tts.setLanguage("en-US");
+    await tts.setPitch(1.0);
+    await tts.setSpeechRate(0.5); // Slow down for accessibility
   }
 
   Future<void> _speakTutorial() async {
     await tts.speak(
-        "Tap anywhere to continue. This app helps you discover nearby places through voice. "
-        "Use commands like 'What's near me?' or download tours for offline use.");
+      "Tap anywhere to continue. "
+      "This app helps you discover nearby places through voice. "
+      "Use commands like, what's near me, or download tours for offline use.",
+    );
   }
 
   @override
@@ -57,13 +73,15 @@ class OnboardingScreenState extends State<OnboardingScreen> {
     return GestureDetector(
       onTap: _goToLogin,
       child: Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: const Color.fromARGB(255, 180, 87, 87),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text("Welcome to EchoPath 👋",
-                  style: TextStyle(color: Colors.white, fontSize: 24)),
+              const Text(
+                "Welcome to EchoPath 👋",
+                style: TextStyle(color: Colors.white, fontSize: 24),
+              ),
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _goToLogin,

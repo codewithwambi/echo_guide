@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart'; // Import GoogleSignIn
-import 'home_screen.dart'; // Ensure this exists and is your main app screen
-
-// For basic logging in development, you can use `debugPrint` or a simple logger
-// For production, consider packages like 'logger' or 'flutter_logs'
-import 'dart:developer' as developer; // Import for developer.log
+import 'package:google_sign_in/google_sign_in.dart';
+import 'home_screen.dart';
+import 'dart:developer' as developer;
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,61 +13,68 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  bool isLoading = false;
 
   Future<void> signInWithGoogle() async {
+    setState(() => isLoading = true);
+
     try {
-      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+      final googleUser = await GoogleSignIn().signIn();
 
       if (googleUser == null) {
-        // User cancelled the sign-in process
+        // User cancelled sign-in
+        if (mounted) setState(() => isLoading = false);
         return;
       }
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final googleAuth = await googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
+
       await _auth.signInWithCredential(credential);
 
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          // --- FIX 1: Removed 'const' from HomeScreen() ---
-          MaterialPageRoute(builder: (context) => HomeScreen()),
-        );
-      }
+      _goToHomeScreen();
     } catch (e) {
-      // --- FIX 2: Replaced print() with developer.log() or debugPrint() ---
       developer.log("Google Sign-In Error: $e", name: "LoginScreen");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Google Sign-In Failed: ${e.toString()}')), // Use e.toString() for better display
+          SnackBar(content: Text('Google Sign-In Failed: $e')),
         );
       }
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
   Future<void> signInAnonymously() async {
+    setState(() => isLoading = true);
+
     try {
       await _auth.signInAnonymously();
-
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          // --- FIX 1: Removed 'const' from HomeScreen() ---
-          MaterialPageRoute(builder: (context) => HomeScreen()),
-        );
-      }
+      _goToHomeScreen();
     } catch (e) {
-      // --- FIX 2: Replaced print() with developer.log() or debugPrint() ---
       developer.log("Anonymous Sign-In Error: $e", name: "LoginScreen");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Anonymous Sign-In Failed: ${e.toString()}')), // Use e.toString() for better display
+          SnackBar(content: Text('Guest Login Failed: $e')),
         );
       }
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
+  }
+
+  void _goToHomeScreen() {
+    if (!mounted) return;
+    // Use post frame callback to ensure clean transition
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
+    });
   }
 
   @override
@@ -78,24 +82,26 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              "Login to EchoPath",
-              style: TextStyle(color: Colors.white, fontSize: 24),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: signInWithGoogle, // Simplified callback
-              child: const Text("Continue with Google"),
-            ),
-            ElevatedButton(
-              onPressed: signInAnonymously, // Simplified callback
-              child: const Text("Continue as Guest"),
-            ),
-          ],
-        ),
+        child: isLoading
+            ? const CircularProgressIndicator(color: Colors.white)
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    "Login to EchoPath",
+                    style: TextStyle(color: Colors.white, fontSize: 24),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: signInWithGoogle,
+                    child: const Text("Continue with Google"),
+                  ),
+                  ElevatedButton(
+                    onPressed: signInAnonymously,
+                    child: const Text("Continue as Guest"),
+                  ),
+                ],
+              ),
       ),
     );
   }
