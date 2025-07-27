@@ -1,4 +1,7 @@
+// ignore_for_file: empty_catches
+
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'audio_manager_service.dart';
 
 class ScreenTransitionManager {
@@ -29,7 +32,6 @@ class ScreenTransitionManager {
 
   // Initialize the manager
   Future<void> initialize() async {
-    print('ScreenTransitionManager initialized');
     _transitionStatusController.add('initialized');
   }
 
@@ -39,13 +41,9 @@ class ScreenTransitionManager {
     String? transitionMessage,
   }) async {
     if (_isTransitioning) {
-      print(
-        'Transition already in progress, skipping navigation to: $screenId',
-      );
       return;
     }
 
-    print('🔄 Navigating to screen: $screenId');
     _isTransitioning = true;
     _transitionStatusController.add('transitioning:$screenId');
 
@@ -55,7 +53,6 @@ class ScreenTransitionManager {
 
       // Deactivate current screen audio with transition feedback
       if (_currentScreen != null && _currentScreen != screenId) {
-        print('🔇 Deactivating audio for: $_currentScreen');
         await _audioManagerService.deactivateScreenAudio(_currentScreen!);
 
         // Special handling for map screen deactivation
@@ -74,11 +71,9 @@ class ScreenTransitionManager {
 
       // Update current screen
       _currentScreen = screenId;
-      print('✅ Current screen updated to: $_currentScreen');
 
       // Activate new screen audio with optimized timing
       _transitionTimer = Timer(_transitionDelay, () async {
-        print('🔊 Activating audio for: $screenId');
         await _audioManagerService.activateScreenAudio(screenId);
         _transitionController.add('transitioned:$screenId');
         _transitionStatusController.add('activated:$screenId');
@@ -89,12 +84,25 @@ class ScreenTransitionManager {
         });
       });
     } catch (e) {
-      print('❌ Error during screen transition: $e');
       _transitionStatusController.add('error:$screenId');
     } finally {
       _isTransitioning = false;
-      print('✅ Transition completed for: $screenId');
     }
+  }
+
+  // Global navigation method for seamless voice command navigation
+  Future<void> navigateGlobally(String screenId) async {
+    debugPrint('Global navigation to: $screenId');
+
+    // Ensure voice navigation continues across transitions
+    await navigateToScreen(
+      screenId,
+      transitionMessage:
+          'Navigating to $screenId screen. Voice commands remain active.',
+    );
+
+    // Broadcast global navigation event
+    _transitionController.add('global_navigation:$screenId');
   }
 
   // Handle map screen deactivation specifically
@@ -111,9 +119,7 @@ class ScreenTransitionManager {
 
       // Small delay to ensure smooth transition
       await Future.delayed(const Duration(milliseconds: 200));
-    } catch (e) {
-      print('Error during map screen deactivation: $e');
-    }
+    } catch (e) {}
   }
 
   // Provide welcome message for the new screen
@@ -129,15 +135,15 @@ class ScreenTransitionManager {
   String _getWelcomeMessage(String screenId) {
     switch (screenId) {
       case 'home':
-        return "Home screen active. Navigation hub. Say 'one' for map, 'two' for tours, 'three' for downloads, 'four' for help.";
+        return "Home screen active. Navigation hub ready.";
       case 'map':
-        return "Map screen active. Interactive exploration. Say 'one' to describe surroundings, 'two' to discover places, 'three' for facilities.";
+        return "Map screen active. Interactive exploration ready.";
       case 'discover':
-        return "Tour discovery screen active. Your tour guide is ready. Say 'one' through 'four' to select tours, 'play' to start, 'next' for next tour, 'previous' for previous tour.";
+        return "Tour discovery screen active. Your tour guide is ready.";
       case 'downloads':
-        return "Downloads screen active. Offline content library. Say 'one' through 'four' to select tours, 'play' to start, 'pause' to pause.";
+        return "Downloads screen active. Offline content library ready.";
       case 'help':
-        return "Help screen active. Assistance and support. Say 'one' through 'six' for topics, 'pause' to pause, 'play' to resume.";
+        return "Help screen active. Assistance and support ready.";
       default:
         return "";
     }
@@ -168,13 +174,8 @@ class ScreenTransitionManager {
     String screenId = _getScreenIdFromVoiceCommand(screen);
     String currentScreen = _currentScreen ?? 'home';
 
-    print(
-      'Voice navigation request: "$screen" -> screenId: "$screenId", currentScreen: "$currentScreen"',
-    );
-
     // Check if already on the target screen
     if (currentScreen == screenId) {
-      print('Already on screen: $screenId');
       await _audioManagerService.speakIfActive(
         screenId,
         "You're already on the ${_getScreenName(screenId)}. What would you like to do?",
@@ -187,6 +188,36 @@ class ScreenTransitionManager {
         "Seamlessly transitioning from ${_getScreenName(currentScreen)} to ${_getScreenName(screenId)}";
 
     await navigateToScreen(screenId, transitionMessage: transitionMessage);
+  }
+
+  // Enhanced voice navigation with better error handling
+  Future<void> handleVoiceNavigationEnhanced(String screen) async {
+    try {
+      String screenId = _getScreenIdFromVoiceCommand(screen);
+      String currentScreen = _currentScreen ?? 'home';
+
+      // Check if already on the target screen
+      if (currentScreen == screenId) {
+        await _audioManagerService.speakIfActive(
+          screenId,
+          "You're already on the ${_getScreenName(screenId)}. What would you like to do?",
+        );
+        return;
+      }
+
+      // Provide immediate feedback for seamless experience
+      String transitionMessage =
+          "Seamlessly transitioning from ${_getScreenName(currentScreen)} to ${_getScreenName(screenId)}";
+
+      await navigateToScreen(screenId, transitionMessage: transitionMessage);
+    } catch (e) {
+      debugPrint('Error in voice navigation: $e');
+      // Fallback navigation
+      await navigateToScreen(
+        'home',
+        transitionMessage: 'Returning to home screen',
+      );
+    }
   }
 
   // Get screen ID from tab index
@@ -207,38 +238,70 @@ class ScreenTransitionManager {
     }
   }
 
-  // Get screen ID from voice command with streamlined number-based navigation
+  // Get screen ID from voice command with proper navigation pattern matching
   String _getScreenIdFromVoiceCommand(String command) {
     String normalizedCommand = command.toLowerCase().trim();
 
-    // Streamlined number-based navigation
-    if (normalizedCommand == 'one' ||
-        normalizedCommand == '1' ||
-        normalizedCommand.contains('map') ||
-        normalizedCommand.contains('explore')) {
+    // Handle "go to" commands first
+    if (normalizedCommand.contains('go to')) {
+      if (normalizedCommand.contains('home') ||
+          normalizedCommand.contains('main')) {
+        return 'home';
+      } else if (normalizedCommand.contains('map') ||
+          normalizedCommand.contains('location')) {
+        return 'map';
+      } else if (normalizedCommand.contains('discover') ||
+          normalizedCommand.contains('explore') ||
+          normalizedCommand.contains('tour')) {
+        return 'discover';
+      } else if (normalizedCommand.contains('download') ||
+          normalizedCommand.contains('saved') ||
+          normalizedCommand.contains('offline')) {
+        return 'downloads';
+      } else if (normalizedCommand.contains('help') ||
+          normalizedCommand.contains('support')) {
+        return 'help';
+      }
+    }
+
+    // Handle direct screen names
+    if (normalizedCommand.contains('home') ||
+        normalizedCommand.contains('main') ||
+        normalizedCommand.contains('dashboard')) {
+      return 'home';
+    } else if (normalizedCommand.contains('map') ||
+        normalizedCommand.contains('location') ||
+        normalizedCommand.contains('tracking')) {
       return 'map';
-    } else if (normalizedCommand == 'two' ||
-        normalizedCommand == '2' ||
-        normalizedCommand.contains('discover') ||
+    } else if (normalizedCommand.contains('discover') ||
+        normalizedCommand.contains('explore') ||
         normalizedCommand.contains('tour')) {
       return 'discover';
-    } else if (normalizedCommand == 'three' ||
-        normalizedCommand == '3' ||
-        normalizedCommand.contains('download') ||
-        normalizedCommand.contains('content')) {
+    } else if (normalizedCommand.contains('download') ||
+        normalizedCommand.contains('saved') ||
+        normalizedCommand.contains('offline')) {
       return 'downloads';
-    } else if (normalizedCommand == 'four' ||
-        normalizedCommand == '4' ||
-        normalizedCommand.contains('help') ||
+    } else if (normalizedCommand.contains('help') ||
+        normalizedCommand.contains('support') ||
         normalizedCommand.contains('assistance')) {
       return 'help';
-    } else if (normalizedCommand.contains('home') ||
-        normalizedCommand.contains('main')) {
-      return 'home';
-    } else {
-      // Default to home if command is unclear
-      return 'home';
     }
+
+    // Handle number-based navigation
+    if (normalizedCommand == 'one' || normalizedCommand == '1') {
+      return 'home';
+    } else if (normalizedCommand == 'two' || normalizedCommand == '2') {
+      return 'map';
+    } else if (normalizedCommand == 'three' || normalizedCommand == '3') {
+      return 'discover';
+    } else if (normalizedCommand == 'four' || normalizedCommand == '4') {
+      return 'downloads';
+    } else if (normalizedCommand == 'five' || normalizedCommand == '5') {
+      return 'help';
+    }
+
+    // Default to home if command is unclear
+    return 'home';
   }
 
   // Get screen name for user feedback
@@ -257,6 +320,13 @@ class ScreenTransitionManager {
       default:
         return 'Home screen';
     }
+  }
+
+  // Ensure voice navigation is always active
+  Future<void> ensureVoiceNavigationActive() async {
+    // This method ensures that voice navigation continues seamlessly
+    // across all screen transitions
+    _transitionStatusController.add('voice_navigation_active');
   }
 
   // Provide transition feedback

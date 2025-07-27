@@ -1,3 +1,5 @@
+// ignore_for_file: empty_catches
+
 import 'dart:async';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
@@ -214,72 +216,6 @@ class VoiceCommandService {
     ],
   };
 
-  // Screen-specific command patterns
-  static const Map<String, List<String>> _homeCommandPatterns = {
-    'navigation': ['one', '1', 'first', 'map', 'go to map'],
-    'tours': ['two', '2', 'second', 'discover', 'go to discover'],
-    'downloads': ['three', '3', 'third', 'downloads', 'go to downloads'],
-    'help': ['four', '4', 'fourth', 'help', 'go to help'],
-    'welcome': ['welcome', 'intro', 'introduction'],
-    'quick_access': ['quick access', 'navigation', 'options'],
-    'status': ['status', 'info', 'information'],
-    'help_commands': ['help', 'assistance', 'commands'],
-  };
-
-  static const Map<String, List<String>> _downloadsCommandPatterns = {
-    'play_tour': [
-      'one',
-      '1',
-      'first',
-      'two',
-      '2',
-      'second',
-      'three',
-      '3',
-      'third',
-      'four',
-      '4',
-      'fourth',
-      'play',
-      'start',
-    ],
-    'pause_tour': ['pause', 'pause tour', 'stop', 'stop tour'],
-    'resume_tour': ['resume', 'resume tour', 'continue', 'continue tour'],
-    'next_tour': ['next', 'next tour', 'skip', 'skip tour'],
-    'previous_tour': ['previous', 'previous tour', 'back', 'back tour'],
-    'download_all': [
-      'download all',
-      'download everything',
-      'get all',
-      'get everything',
-    ],
-    'delete_downloads': [
-      'delete',
-      'delete downloads',
-      'clear',
-      'clear downloads',
-    ],
-    'show_downloads': [
-      'show downloads',
-      'list downloads',
-      'what downloads',
-      'my downloads',
-    ],
-    'help': ['help', 'assistance', 'commands'],
-  };
-
-  static const Map<String, List<String>> _helpCommandPatterns = {
-    'navigation_help': ['one', '1', 'first', 'navigation'],
-    'map_help': ['two', '2', 'second', 'map'],
-    'tours_help': ['three', '3', 'third', 'tours'],
-    'downloads_help': ['four', '4', 'fourth', 'downloads'],
-    'audio_help': ['five', '5', 'fifth', 'audio'],
-    'help_help': ['six', '6', 'sixth', 'help'],
-    'read_all': ['read all', 'read all topics', 'all topics', 'everything'],
-    'go_back': ['go back', 'back', 'return', 'home'],
-    'help': ['help', 'assistance', 'commands'],
-  };
-
   // Initialize the service
   Future<bool> initialize() async {
     if (_isInitialized) return true;
@@ -291,7 +227,6 @@ class VoiceCommandService {
       _voiceStatusController.add('initialized');
       return true;
     } catch (e) {
-      print('VoiceCommandService initialization error: $e');
       _voiceStatusController.add('error:initialization');
       return false;
     }
@@ -324,7 +259,6 @@ class VoiceCommandService {
 
   // Enhanced error handling for speech recognition
   void _onSpeechError(dynamic error) {
-    print('Speech recognition error: $error');
     _consecutiveErrors++;
 
     if (_consecutiveErrors >= _maxConsecutiveErrors) {
@@ -337,7 +271,6 @@ class VoiceCommandService {
   }
 
   void _onSpeechStatus(String status) {
-    print('Speech recognition status: $status');
     _voiceStatusController.add('status:$status');
 
     if (status == 'listening') {
@@ -346,7 +279,6 @@ class VoiceCommandService {
   }
 
   void _handleConsecutiveErrors() {
-    print('Too many consecutive errors, restarting speech recognition');
     _restartSpeechRecognition();
   }
 
@@ -366,9 +298,7 @@ class VoiceCommandService {
       if (_isListening) {
         await _startListeningCycle();
       }
-    } catch (e) {
-      print('Error restarting speech recognition: $e');
-    }
+    } catch (e) {}
   }
 
   // Start continuous listening for screen-specific commands
@@ -422,7 +352,6 @@ class VoiceCommandService {
         }
       });
     } catch (e) {
-      print('Error in listening cycle: $e');
       if (_isListening) {
         _scheduleErrorRecovery();
       }
@@ -433,7 +362,6 @@ class VoiceCommandService {
   void _onSpeechResult(dynamic result) {
     if (result.finalResult) {
       final command = result.recognizedWords.toLowerCase().trim();
-      print('Recognized command: "$command"');
 
       if (command.isNotEmpty) {
         _processScreenSpecificCommand(command);
@@ -443,8 +371,6 @@ class VoiceCommandService {
 
   // Process screen-specific commands with context awareness
   Future<void> _processScreenSpecificCommand(String command) async {
-    print('Processing screen-specific command: "$command"');
-
     // IMMEDIATELY stop any ongoing speech when user starts speaking
     await _stopCurrentSpeech();
 
@@ -478,8 +404,6 @@ class VoiceCommandService {
 
   // Process discover screen specific commands
   Future<void> _processDiscoverCommand(String command) async {
-    print('Processing discover command: "$command"');
-
     // Check for discover-specific command patterns
     for (final entry in _discoverCommandPatterns.entries) {
       if (_matchesPattern(command, entry.value)) {
@@ -585,7 +509,6 @@ class VoiceCommandService {
           break;
       }
     } catch (e) {
-      print('Error executing discover command: $e');
       await _provideErrorFeedback();
     }
   }
@@ -784,10 +707,7 @@ class VoiceCommandService {
     try {
       await _tts.stop();
       await _audioManager.stopAllAudio();
-      print('Stopped current speech to listen to user');
-    } catch (e) {
-      print('Error stopping speech: $e');
-    }
+    } catch (e) {}
   }
 
   // Centralized method to handle screen-specific narration
@@ -802,9 +722,7 @@ class VoiceCommandService {
         text,
         interrupt: interrupt,
       );
-    } catch (e) {
-      print('Error narrating for current screen: $e');
-    }
+    } catch (e) {}
   }
 
   // Provide discover-specific default response
@@ -833,7 +751,7 @@ class VoiceCommandService {
 
   // Provide haptic feedback
   Future<void> _provideHapticFeedback() async {
-    if (await Vibration.hasVibrator() ?? false) {
+    if (await Vibration.hasVibrator() == true) {
       Vibration.vibrate(duration: 100);
     }
   }

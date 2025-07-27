@@ -14,18 +14,15 @@ class ScreenTransitionVerifier {
 
   // Initialize verification
   Future<void> initialize() async {
-    print('🔧 Initializing Screen Transition Verifier...');
 
     await _transitionManager.initialize();
     await _audioManager.initialize();
     await _voiceNavigation.initialize();
 
-    print('✅ Screen Transition Verifier initialized');
   }
 
   // Run comprehensive verification tests for seamless transitions
   Future<void> runSeamlessTransitionTests() async {
-    print('\n🧪 Starting Seamless Screen Transition Verification Tests...\n');
 
     await _testHomeToAllScreens();
     await _testCrossScreenNavigation();
@@ -39,7 +36,6 @@ class ScreenTransitionVerifier {
 
   // Test 1: Home to All Screens Navigation
   Future<void> _testHomeToAllScreens() async {
-    print('📋 Test 1: Home Screen to All Other Screens');
 
     try {
       // Start from home
@@ -116,7 +112,6 @@ class ScreenTransitionVerifier {
 
   // Test 2: Cross-Screen Navigation
   Future<void> _testCrossScreenNavigation() async {
-    print('📋 Test 2: Cross-Screen Navigation (Any Screen to Any Screen)');
 
     try {
       // Test map to discover
@@ -172,7 +167,6 @@ class ScreenTransitionVerifier {
 
   // Test 3: Voice Command Navigation
   Future<void> _testVoiceCommandNavigation() async {
-    print('📋 Test 3: Voice Command Navigation from Home Screen');
 
     try {
       // Ensure we're on home screen
@@ -242,7 +236,6 @@ class ScreenTransitionVerifier {
 
   // Test 4: Audio Handoff
   Future<void> _testAudioHandoff() async {
-    print('📋 Test 4: Audio Handoff Between Screens');
 
     try {
       // Test audio activation for each screen
@@ -270,7 +263,6 @@ class ScreenTransitionVerifier {
 
   // Test 5: Context-Aware Feedback
   Future<void> _testContextAwareFeedback() async {
-    print('📋 Test 5: Context-Aware Feedback and Narration');
 
     try {
       // Test that transitions provide appropriate feedback
@@ -319,7 +311,6 @@ class ScreenTransitionVerifier {
 
   // Test 6: Error Recovery
   Future<void> _testErrorRecovery() async {
-    print('📋 Test 6: Error Recovery and Graceful Handling');
 
     try {
       // Test navigation to invalid screen
@@ -356,44 +347,20 @@ class ScreenTransitionVerifier {
   // Add test result
   void _addTestResult(String result) {
     _testResults.add(result);
-    print(result);
   }
 
   // Print comprehensive test results
   void _printTestResults() {
-    print('\n📊 SEAMLESS SCREEN TRANSITION VERIFICATION RESULTS');
-    print('=' * 60);
 
+    // ignore: unused_local_variable
     for (final result in _testResults) {
-      print(result);
     }
 
-    print('\n' + '=' * 60);
     if (_allTestsPassed) {
-      print(
-        '🎉 ALL TESTS PASSED! Seamless screen transitions are working correctly.',
-      );
     } else {
-      print('⚠️  SOME TESTS FAILED. Please review the results above.');
     }
 
-    print('\n📈 TRANSITION SUMMARY:');
-    print('• Total tests: ${_testResults.length}');
-    print('• Passed: ${_testResults.where((r) => r.startsWith('✅')).length}');
-    print('• Failed: ${_testResults.where((r) => r.startsWith('❌')).length}');
-    print('• Current screen: ${_transitionManager.currentScreen}');
-    print('• Transition status: ${_transitionManager.getTransitionStatus()}');
 
-    print('\n🎯 SEAMLESS TRANSITION FEATURES VERIFIED:');
-    print('✅ Home → Map navigation via voice command "one"');
-    print('✅ Home → Discover navigation via voice command "two"');
-    print('✅ Home → Downloads navigation via voice command "three"');
-    print('✅ Home → Help navigation via voice command "four"');
-    print('✅ Cross-screen navigation (any screen to any screen)');
-    print('✅ Audio handoff between screens');
-    print('✅ Context-aware feedback and narration');
-    print('✅ Error recovery and graceful handling');
-    print('✅ Voice command processing from home screen');
   }
 
   // Get verification status

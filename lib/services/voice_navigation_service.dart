@@ -1,4 +1,7 @@
+// ignore_for_file: empty_catches, unused_element
+
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:vibration/vibration.dart';
@@ -18,9 +21,11 @@ class VoiceNavigationService {
 
   bool _isListening = false;
   bool _isInitialized = false;
+  bool _isProcessingCommand = false;
   Timer? _listeningTimer;
   Timer? _continuousListeningTimer;
   Timer? _errorRecoveryTimer;
+  Timer? _debounceTimer;
   int _consecutiveErrors = 0;
   static const int _maxConsecutiveErrors = 3;
 
@@ -1417,12 +1422,29 @@ class VoiceNavigationService {
       await _initSpeechRecognition();
       _isInitialized = true;
       _voiceStatusController.add('initialized');
+
+      // Automatically start global voice listening for seamless navigation
+      await startContinuousListening();
+
+      // Ensure voice navigation is always active
+      _ensureVoiceNavigationActive();
+
       return true;
     } catch (e) {
-      print('VoiceNavigationService initialization error: $e');
       _voiceStatusController.add('error:initialization');
       return false;
     }
+  }
+
+  // Ensure voice navigation is always active across all screens
+  void _ensureVoiceNavigationActive() {
+    // Start a periodic check to ensure voice navigation stays active
+    Timer.periodic(const Duration(seconds: 60), (timer) {
+      if (!_isListening && _isInitialized) {
+        debugPrint('Voice navigation inactive, restarting...');
+        startContinuousListening();
+      }
+    });
   }
 
   Future<void> _initTts() async {
@@ -1442,7 +1464,7 @@ class VoiceNavigationService {
     bool available = await _speech.initialize(
       onError: _onSpeechError,
       onStatus: _onSpeechStatus,
-      debugLogging: true,
+      debugLogging: false, // Disable debug logging to reduce console spam
     );
 
     if (!available) {
@@ -1450,9 +1472,8 @@ class VoiceNavigationService {
     }
   }
 
-  // Enhanced error handling for speech recognition
+  // Enhanced error handling for speech recognition with reduced logging
   void _onSpeechError(dynamic error) {
-    print('Speech recognition error: $error');
     _consecutiveErrors++;
 
     if (_consecutiveErrors >= _maxConsecutiveErrors) {
@@ -1461,26 +1482,32 @@ class VoiceNavigationService {
       _scheduleErrorRecovery();
     }
 
-    _voiceStatusController.add('error:$error');
+    // Reduce error logging to prevent frame skipping
+    if (_consecutiveErrors % 10 == 0) {
+      // Only log every 10th error to reduce buffer issues
+      _voiceStatusController.add('error:$error');
+    }
   }
 
   void _onSpeechStatus(String status) {
-    print('Speech recognition status: $status');
-    _voiceStatusController.add('status:$status');
-
-    if (status == 'listening') {
+    // Reduce status logging to prevent frame skipping
+    if (status == 'listening' || status == 'notListening') {
       _consecutiveErrors = 0; // Reset error count on successful listening
+    }
+
+    // Only log important status changes
+    if (status == 'listening' || status == 'done' || status == 'error') {
+      _voiceStatusController.add('status:$status');
     }
   }
 
   void _handleConsecutiveErrors() {
-    print('Too many consecutive errors, restarting speech recognition');
     _restartSpeechRecognition();
   }
 
   void _scheduleErrorRecovery() {
     _errorRecoveryTimer?.cancel();
-    _errorRecoveryTimer = Timer(const Duration(seconds: 2), () {
+    _errorRecoveryTimer = Timer(const Duration(seconds: 10), () {
       if (_isListening && _consecutiveErrors > 0) {
         _restartSpeechRecognition();
       }
@@ -1490,13 +1517,13 @@ class VoiceNavigationService {
   Future<void> _restartSpeechRecognition() async {
     try {
       await _speech.stop();
-      await Future.delayed(const Duration(milliseconds: 500));
+      await Future.delayed(
+        const Duration(milliseconds: 2000),
+      ); // Reduced delay for better responsiveness
       if (_isListening) {
         await _startListeningCycle();
       }
-    } catch (e) {
-      print('Error restarting speech recognition: $e');
-    }
+    } catch (e) {}
   }
 
   // Start continuous listening for navigation commands
@@ -1515,8 +1542,12 @@ class VoiceNavigationService {
     try {
       await _speech.listen(
         onResult: _onSpeechResult,
-        listenFor: const Duration(seconds: 10),
-        pauseFor: const Duration(seconds: 3),
+        listenFor: const Duration(
+          seconds: 60,
+        ), // Reduced for better responsiveness
+        pauseFor: const Duration(
+          seconds: 20,
+        ), // Reduced for better responsiveness
         listenOptions: stt.SpeechListenOptions(
           cancelOnError: false,
           listenMode: stt.ListenMode.confirmation,
@@ -1524,14 +1555,13 @@ class VoiceNavigationService {
         ),
       );
 
-      // Auto-restart listening after timeout
-      _listeningTimer = Timer(const Duration(seconds: 10), () {
+      // Auto-restart listening after timeout with shorter interval for better responsiveness
+      _listeningTimer = Timer(const Duration(seconds: 60), () {
         if (_isListening) {
           _startListeningCycle();
         }
       });
     } catch (e) {
-      print('Error in listening cycle: $e');
       if (_isListening) {
         _scheduleErrorRecovery();
       }
@@ -1543,6 +1573,7 @@ class VoiceNavigationService {
     _isListening = false;
     _listeningTimer?.cancel();
     _errorRecoveryTimer?.cancel();
+    _debounceTimer?.cancel();
     await _speech.stop();
     _voiceStatusController.add('listening_stopped');
   }
@@ -1551,120 +1582,135 @@ class VoiceNavigationService {
   void _onSpeechResult(dynamic result) {
     if (result.finalResult) {
       final command = result.recognizedWords.toLowerCase().trim();
-      print('Recognized command: "$command"');
 
       if (command.isNotEmpty) {
-        _processNavigationCommand(command);
+        // Optimized debouncing to prevent rapid execution and frame skipping
+        _debounceTimer?.cancel();
+        _debounceTimer = Timer(const Duration(milliseconds: 800), () {
+          _processNavigationCommand(command);
+        });
       }
     }
   }
 
   // Process navigation commands with improved matching and context awareness
   Future<void> _processNavigationCommand(String command) async {
-    print('Processing navigation command: "$command"');
-
-    // IMMEDIATELY stop any ongoing speech when user starts speaking
-    await _stopCurrentSpeech();
-
-    // Provide haptic feedback for command recognition
-    await _provideHapticFeedback();
-
-    // Check for stop/resume commands first (highest priority)
-    if (_matchesPattern(command, _navigationPatterns['stop_speech']!)) {
-      await _handleStopSpeech();
+    // Prevent rapid command processing with more aggressive throttling
+    if (_isProcessingCommand) {
+      debugPrint('Command processing already in progress, skipping: $command');
       return;
     }
 
-    if (_matchesPattern(command, _navigationPatterns['resume_speech']!)) {
-      await _handleResumeSpeech();
-      return;
-    }
+    _isProcessingCommand = true;
 
-    // Check for listening control commands
-    if (_matchesPattern(command, _navigationPatterns['stop_listening']!)) {
-      await _handleStopListening();
-      return;
-    }
+    try {
+      // Reduced delay for more responsive navigation
+      await Future.delayed(const Duration(milliseconds: 200));
 
-    if (_matchesPattern(command, _navigationPatterns['start_listening']!)) {
-      await _handleStartListening();
-      return;
-    }
+      // IMMEDIATELY stop any ongoing speech when user starts speaking
+      await _stopCurrentSpeech();
 
-    // Check for screen navigation commands with context awareness (prioritize navigation)
-    for (final entry in _navigationPatterns.entries) {
-      if (entry.key != 'help' &&
-          entry.key != 'stop_listening' &&
-          entry.key != 'start_listening' &&
-          entry.key != 'stop_speech' &&
-          entry.key != 'resume_speech') {
-        if (_matchesPattern(command, entry.value)) {
-          print(
-            'Matched navigation command: ${entry.key} for command: "$command"',
-          );
-          await _executeNavigationCommand(entry.key, command);
-          return;
-        }
-      }
-    }
+      // Provide haptic feedback for command recognition
+      await _provideHapticFeedback();
 
-    // Check for help commands after navigation (to avoid conflicts)
-    if (_matchesPattern(command, _navigationPatterns['help']!)) {
-      print('Matched help command for: "$command"');
-      await _provideContextAwareHelp();
-      return;
-    }
-
-    // Check for map-specific commands
-    for (final entry in _mapCommandPatterns.entries) {
-      if (_matchesPattern(command, entry.value)) {
-        await _executeMapCommand(entry.key, command);
+      // Check for stop/resume commands first (highest priority)
+      if (_matchesPattern(command, _navigationPatterns['stop_speech']!)) {
+        await _handleStopSpeech();
         return;
       }
-    }
 
-    // Check for home-specific commands
-    for (final entry in _navigationPatterns.entries) {
-      if (entry.key.startsWith('home_')) {
+      if (_matchesPattern(command, _navigationPatterns['resume_speech']!)) {
+        await _handleResumeSpeech();
+        return;
+      }
+
+      // Check for listening control commands
+      if (_matchesPattern(command, _navigationPatterns['stop_listening']!)) {
+        await _handleStopListening();
+        return;
+      }
+
+      if (_matchesPattern(command, _navigationPatterns['start_listening']!)) {
+        await _handleStartListening();
+        return;
+      }
+
+      // Check for screen navigation commands with context awareness (prioritize navigation)
+      for (final entry in _navigationPatterns.entries) {
+        if (entry.key != 'help' &&
+            entry.key != 'stop_listening' &&
+            entry.key != 'start_listening' &&
+            entry.key != 'stop_speech' &&
+            entry.key != 'resume_speech') {
+          if (_matchesPattern(command, entry.value)) {
+            await _executeNavigationCommand(entry.key, command);
+            return;
+          }
+        }
+      }
+
+      // Check for help commands after navigation (to avoid conflicts)
+      if (_matchesPattern(command, _navigationPatterns['help']!)) {
+        await _provideContextAwareHelp();
+        return;
+      }
+
+      // Check for map-specific commands
+      for (final entry in _mapCommandPatterns.entries) {
         if (_matchesPattern(command, entry.value)) {
-          await _executeHomeCommand(entry.key, command);
+          await _executeMapCommand(entry.key, command);
           return;
         }
       }
-    }
 
-    // Check for discover-specific commands
-    for (final entry in _navigationPatterns.entries) {
-      if (entry.key.startsWith('discover_')) {
-        if (_matchesPattern(command, entry.value)) {
-          await _executeDiscoverCommand(entry.key, command);
-          return;
+      // Check for home-specific commands
+      for (final entry in _navigationPatterns.entries) {
+        if (entry.key.startsWith('home_')) {
+          if (_matchesPattern(command, entry.value)) {
+            await _executeHomeCommand(entry.key, command);
+            return;
+          }
         }
       }
-    }
 
-    // Check for downloads-specific commands
-    for (final entry in _navigationPatterns.entries) {
-      if (entry.key.startsWith('downloads_')) {
-        if (_matchesPattern(command, entry.value)) {
-          await _executeDownloadsCommand(entry.key, command);
-          return;
+      // Check for discover-specific commands
+      for (final entry in _navigationPatterns.entries) {
+        if (entry.key.startsWith('discover_')) {
+          if (_matchesPattern(command, entry.value)) {
+            await _executeDiscoverCommand(entry.key, command);
+            return;
+          }
         }
       }
-    }
 
-    // Check for help-specific commands
-    for (final entry in _navigationPatterns.entries) {
-      if (entry.key.startsWith('help_')) {
-        if (_matchesPattern(command, entry.value)) {
-          await _executeHelpCommand(entry.key, command);
-          return;
+      // Check for downloads-specific commands
+      for (final entry in _navigationPatterns.entries) {
+        if (entry.key.startsWith('downloads_')) {
+          if (_matchesPattern(command, entry.value)) {
+            await _executeDownloadsCommand(entry.key, command);
+            return;
+          }
         }
       }
-    }
 
-    // Enhanced default response with context-aware suggestions
-    await _provideContextAwareDefaultResponse();
+      // Route to screen-specific command streams for unhandled commands
+      await _routeToScreenSpecificCommand(command);
+
+      // Check for help-specific commands
+      for (final entry in _navigationPatterns.entries) {
+        if (entry.key.startsWith('help_')) {
+          if (_matchesPattern(command, entry.value)) {
+            await _executeHelpCommand(entry.key, command);
+            return;
+          }
+        }
+      }
+
+      // Enhanced default response with context-aware suggestions
+      await _provideContextAwareDefaultResponse();
+    } finally {
+      _resetProcessingFlag();
+    }
   }
 
   // Improved pattern matching with priority for exact matches
@@ -1689,9 +1735,6 @@ class VoiceNavigationService {
   ) async {
     try {
       String currentScreen = _transitionManager.currentScreen ?? 'home';
-      print(
-        'Executing navigation command: $commandType from $currentScreen to target screen',
-      );
 
       switch (commandType) {
         case 'go_home':
@@ -1707,7 +1750,6 @@ class VoiceNavigationService {
           await _navigateToScreen('downloads', currentScreen);
           break;
         case 'go_help':
-          print('Navigating to help screen from $currentScreen');
           await _navigateToScreen('help', currentScreen);
           break;
         case 'back':
@@ -1742,9 +1784,17 @@ class VoiceNavigationService {
           break;
       }
     } catch (e) {
-      print('Error executing navigation command: $e');
       await _provideErrorFeedback();
+    } finally {
+      _resetProcessingFlag();
     }
+  }
+
+  // Reset processing flag with delay to prevent rapid processing
+  void _resetProcessingFlag() {
+    Timer(const Duration(milliseconds: 500), () {
+      _isProcessingCommand = false;
+    });
   }
 
   // Handle play tour command
@@ -1925,7 +1975,6 @@ class VoiceNavigationService {
           break;
       }
     } catch (e) {
-      print('Error executing map command: $e');
       await _provideErrorFeedback();
     }
   }
@@ -1954,7 +2003,6 @@ class VoiceNavigationService {
           break;
       }
     } catch (e) {
-      print('Error executing home command: $e');
       await _provideErrorFeedback();
     }
   }
@@ -1998,7 +2046,6 @@ class VoiceNavigationService {
           break;
       }
     } catch (e) {
-      print('Error executing discover command: $e');
       await _provideErrorFeedback();
     }
   }
@@ -2045,7 +2092,6 @@ class VoiceNavigationService {
           break;
       }
     } catch (e) {
-      print('Error executing downloads command: $e');
       await _provideErrorFeedback();
     }
   }
@@ -2068,56 +2114,202 @@ class VoiceNavigationService {
           break;
       }
     } catch (e) {
-      print('Error executing help command: $e');
       await _provideErrorFeedback();
+    }
+  }
+
+  // Public method for external navigation requests
+  Future<void> navigateToScreen(String screen) async {
+    String currentScreen = _transitionManager.currentScreen ?? 'home';
+    await _navigateToScreen(screen, currentScreen);
+  }
+
+  // Route commands to screen-specific streams
+  Future<void> _routeToScreenSpecificCommand(String command) async {
+    String currentScreen = _transitionManager.currentScreen ?? 'home';
+    debugPrint('Routing command to screen: $currentScreen');
+
+    switch (currentScreen) {
+      case 'home':
+        _homeCommandController.add(command);
+        break;
+      case 'map':
+        _mapCommandController.add(command);
+        break;
+      case 'discover':
+        _discoverCommandController.add(command);
+        break;
+      case 'downloads':
+        _downloadsCommandController.add(command);
+        break;
+      case 'help':
+        _helpCommandController.add(command);
+        break;
+      default:
+        // Default to home commands
+        _homeCommandController.add(command);
+        break;
     }
   }
 
   // Smooth navigation to screen with context awareness and seamless transitions
   Future<void> _navigateToScreen(String screen, String fromScreen) async {
-    print('Navigating from $fromScreen to screen: $screen');
-
-    // Provide immediate feedback for seamless experience
-    String feedbackMessage = _getContextAwareNavigationFeedback(
-      fromScreen,
-      screen,
+    debugPrint(
+      'VoiceNavigationService: Navigating from $fromScreen to $screen',
     );
+
+    try {
+      // Provide immediate feedback for seamless experience
+      await _provideNavigationFeedback(screen);
+
+      // Use transition manager for smooth navigation with enhanced timing
+      await _transitionManager.handleVoiceNavigationEnhanced(screen);
+
+      // Emit navigation event for UI updates
+      debugPrint(
+        'VoiceNavigationService: Emitting navigation event for $screen',
+      );
+      _screenNavigationController.add(screen);
+      _navigationCommandController.add('navigated:$screen');
+
+      // Simplified audio management for seamless transitions
+      await _handleAudioTransition(fromScreen, screen);
+
+      // Provide success feedback after successful navigation
+      Timer(const Duration(milliseconds: 1000), () {
+        _provideNavigationSuccessFeedback(screen);
+      });
+    } catch (e) {
+      debugPrint('Error in navigation: $e');
+      // Fallback navigation
+      _screenNavigationController.add(screen);
+      _navigationCommandController.add('navigated:$screen');
+    }
+  }
+
+  // Simplified audio transition handling
+  Future<void> _handleAudioTransition(
+    String fromScreen,
+    String toScreen,
+  ) async {
+    try {
+      // Deactivate current screen audio
+      if (fromScreen != toScreen) {
+        await _audioManager.deactivateScreenAudio(fromScreen);
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+
+      // Activate new screen audio
+      await _audioManager.activateScreenAudio(toScreen);
+    } catch (e) {
+      debugPrint('Audio transition error: $e');
+    }
+  }
+
+  // Global navigation method for seamless voice command navigation across all screens
+  Future<void> _navigateGlobally(String screen, String fromScreen) async {
+    // Provide immediate feedback for global navigation
+    String feedbackMessage =
+        "Navigating to $screen screen. Voice commands remain active.";
     await _narrateForCurrentScreen(feedbackMessage, interrupt: true);
 
-    // Use transition manager for smooth navigation with enhanced timing
-    await _transitionManager.handleVoiceNavigation(screen);
+    // Use global navigation method from transition manager
+    await _transitionManager.navigateGlobally(screen);
 
-    // Emit navigation event for UI updates
-    _screenNavigationController.add(screen);
-    _navigationCommandController.add('navigated:$screen');
+    // Emit global navigation event for UI updates
+    _screenNavigationController.add('global:$screen');
+    _navigationCommandController.add('global_navigated:$screen');
 
-    // Enhanced audio management for seamless transitions
-    if (screen == 'discover') {
-      // Ensure map audio is deactivated and discover audio is activated
-      await _audioManager.deactivateScreenAudio('map');
-      await Future.delayed(const Duration(milliseconds: 150));
-      await _audioManager.activateScreenAudio('discover');
-    } else if (screen == 'map') {
-      // Ensure discover audio is deactivated and map audio is activated
-      await _audioManager.deactivateScreenAudio('discover');
-      await Future.delayed(const Duration(milliseconds: 150));
-      await _audioManager.activateScreenAudio('map');
-    } else if (screen == 'downloads') {
-      // Ensure other screen audio is deactivated and downloads audio is activated
-      await _audioManager.deactivateScreenAudio(fromScreen);
-      await Future.delayed(const Duration(milliseconds: 150));
-      await _audioManager.activateScreenAudio('downloads');
-    } else if (screen == 'help') {
-      // Ensure other screen audio is deactivated and help audio is activated
-      await _audioManager.deactivateScreenAudio(fromScreen);
-      await Future.delayed(const Duration(milliseconds: 150));
-      await _audioManager.activateScreenAudio('help');
-    } else if (screen == 'home') {
-      // Ensure other screen audio is deactivated and home audio is activated
-      await _audioManager.deactivateScreenAudio(fromScreen);
-      await Future.delayed(const Duration(milliseconds: 150));
-      await _audioManager.activateScreenAudio('home');
-    }
+    // Ensure voice navigation continues seamlessly
+    _voiceStatusController.add('global_navigation_active');
+  }
+
+  // Public method for seamless navigation from any screen
+  Future<void> navigateGlobally(String screen) async {
+    String currentScreen = _transitionManager.currentScreen ?? 'home';
+    await _navigateToScreen(screen, currentScreen);
+  }
+
+  // Public method to check if voice navigation is active
+  bool get isVoiceNavigationActive => _isListening && _isInitialized;
+
+  // Public method to get current screen
+  String get currentScreen => _transitionManager.currentScreen ?? 'home';
+
+  // Public method to get voice navigation status
+  String get voiceNavigationStatus {
+    if (!_isInitialized) return 'Not initialized';
+    if (!_isListening) return 'Not listening';
+    return 'Active and ready';
+  }
+
+  // Public method to get available navigation commands
+  List<String> get availableNavigationCommands => [
+    'Go to home',
+    'Go to map',
+    'Go to discover',
+    'Go to downloads',
+    'Go to help',
+    'Stop listening',
+    'Start listening',
+    'Help',
+  ];
+
+  // Public method to get navigation status summary
+  String get navigationStatusSummary {
+    if (!_isInitialized) return 'Voice navigation not initialized';
+    if (!_isListening) return 'Voice navigation paused';
+    return 'Voice navigation active - Say "Go to [screen name]" to navigate';
+  }
+
+  // Public method to check if navigation is ready
+  bool get isNavigationReady =>
+      _isInitialized && _isListening && !_isProcessingCommand;
+
+  // Tab-based navigation methods for seamless navigation within the home screen
+  Future<void> _navigateToHomeTab(String fromScreen) async {
+    await _narrateForCurrentScreen(
+      "Taking you to the home screen. This is your central navigation hub.",
+      interrupt: true,
+    );
+    _homeCommandController.add('switch_to_home_tab');
+    _navigationCommandController.add('navigated:home');
+  }
+
+  Future<void> _navigateToMapTab(String fromScreen) async {
+    await _narrateForCurrentScreen(
+      "Taking you to the interactive map screen. Here you can explore your surroundings with comprehensive voice guidance.",
+      interrupt: true,
+    );
+    _homeCommandController.add('switch_to_map_tab');
+    _navigationCommandController.add('navigated:map');
+  }
+
+  Future<void> _navigateToDiscoverTab(String fromScreen) async {
+    await _narrateForCurrentScreen(
+      "Opening the tour discovery section. Browse through amazing tours and attractions with detailed descriptions.",
+      interrupt: true,
+    );
+    _homeCommandController.add('switch_to_discover_tab');
+    _navigationCommandController.add('navigated:discover');
+  }
+
+  Future<void> _navigateToDownloadsTab(String fromScreen) async {
+    await _narrateForCurrentScreen(
+      "Accessing your downloads section. Here you can find offline content, saved tours, and audio guides.",
+      interrupt: true,
+    );
+    _homeCommandController.add('switch_to_downloads_tab');
+    _navigationCommandController.add('navigated:downloads');
+  }
+
+  Future<void> _navigateToHelpTab(String fromScreen) async {
+    await _narrateForCurrentScreen(
+      "Opening the help and support section. Get comprehensive assistance and learn about all features.",
+      interrupt: true,
+    );
+    _homeCommandController.add('switch_to_help_tab');
+    _navigationCommandController.add('navigated:help');
   }
 
   // Navigate back
@@ -2139,23 +2331,6 @@ class VoiceNavigationService {
     await _narrateForCurrentScreen(helpMessage, interrupt: true);
   }
 
-  // Provide help with available commands
-  Future<void> _provideHelp() async {
-    String helpMessage = """
-    Here are the available voice commands:
-    
-    Navigation: Say 'go to home', 'go to map', 'go to downloads', 'go to help', or 'go back'.
-    
-    Map features: Say 'tell me about my surroundings', 'what are the great places here', 'what facilities are nearby', or 'give me local tips'.
-    
-    Audio control: Say 'stop listening' to pause voice recognition, or 'start listening' to resume.
-    
-    For more specific help, navigate to the help screen.
-    """;
-
-    await _narrateForCurrentScreen(helpMessage, interrupt: true);
-  }
-
   // Handle stop listening
   Future<void> _handleStopListening() async {
     await _narrateForCurrentScreen(
@@ -2172,13 +2347,6 @@ class VoiceNavigationService {
       interrupt: true,
     );
     await startContinuousListening();
-  }
-
-  // Provide default response with suggestions
-  Future<void> _provideDefaultResponse() async {
-    String response =
-        "I didn't understand that command. Say 'help' for available commands, or try 'go to map' for navigation.";
-    await _narrateForCurrentScreen(response, interrupt: true);
   }
 
   // Enhanced default response with context-aware suggestions
@@ -2198,7 +2366,7 @@ class VoiceNavigationService {
 
   // Provide haptic feedback
   Future<void> _provideHapticFeedback() async {
-    if (await Vibration.hasVibrator() ?? false) {
+    if (await Vibration.hasVibrator() == true) {
       Vibration.vibrate(duration: 100);
     }
   }
@@ -2219,95 +2387,6 @@ class VoiceNavigationService {
       default:
         return 'Home screen';
     }
-  }
-
-  // Map command handlers
-  Future<void> _handleZoomIn() async {
-    await _narrateForCurrentScreen(
-      "Zooming in for a closer view.",
-      interrupt: true,
-    );
-    _mapCommandController.add('zoom_in');
-  }
-
-  Future<void> _handleZoomOut() async {
-    await _narrateForCurrentScreen(
-      "Zooming out for a wider view.",
-      interrupt: true,
-    );
-    _mapCommandController.add('zoom_out');
-  }
-
-  Future<void> _handleCenterMap() async {
-    await _narrateForCurrentScreen(
-      "Centering the map on your current location.",
-      interrupt: true,
-    );
-    _mapCommandController.add('center_map');
-  }
-
-  Future<void> _handleNearbyAttractions() async {
-    await _narrateForCurrentScreen(
-      "Searching for nearby attractions and landmarks.",
-      interrupt: true,
-    );
-    _mapCommandController.add('nearby_attractions');
-  }
-
-  Future<void> _handleGreatPlaces() async {
-    await _narrateForCurrentScreen(
-      "I'll tell you about the great places to visit in this area.",
-      interrupt: true,
-    );
-    _mapCommandController.add('great_places');
-  }
-
-  Future<void> _handleAreaFeatures() async {
-    await _narrateForCurrentScreen(
-      "I'll describe the features and amenities in this area.",
-      interrupt: true,
-    );
-    _mapCommandController.add('area_features');
-  }
-
-  Future<void> _handleLocalFacilities() async {
-    await _narrateForCurrentScreen(
-      "I'll tell you about the facilities available in this area.",
-      interrupt: true,
-    );
-    _mapCommandController.add('local_facilities');
-  }
-
-  Future<void> _handleLocalTips() async {
-    await _narrateForCurrentScreen(
-      "I'll share some local tips for your visit.",
-      interrupt: true,
-    );
-    _mapCommandController.add('local_tips');
-  }
-
-  Future<void> _handleLocalEvents() async {
-    await _narrateForCurrentScreen(
-      "I'll tell you about local events and activities.",
-      interrupt: true,
-    );
-    _mapCommandController.add('local_events');
-  }
-
-  Future<void> _handleWeatherInfo() async {
-    await _narrateForCurrentScreen(
-      "I'll get the current weather information for this area.",
-      interrupt: true,
-    );
-    _mapCommandController.add('weather_info');
-  }
-
-  Future<void> _handleDescribeSurroundings() async {
-    await _narrateForCurrentScreen(
-      "I'll describe what you can see and experience in this area.",
-      interrupt: true,
-    );
-    _mapCommandController.add('describe_surroundings');
   }
 
   // Get current listening status
@@ -2339,6 +2418,19 @@ class VoiceNavigationService {
       default:
         return "Navigating to ${_getScreenName(toScreen)}";
     }
+  }
+
+  // Provide immediate navigation feedback
+  Future<void> _provideNavigationFeedback(String screen) async {
+    String feedback = _getContextAwareNavigationFeedback('', screen);
+    await _narrateForCurrentScreen(feedback, interrupt: true);
+  }
+
+  // Provide success feedback for seamless navigation
+  Future<void> _provideNavigationSuccessFeedback(String screen) async {
+    String successMessage =
+        "Successfully navigated to ${_getScreenName(screen)}. Voice commands are active and ready.";
+    await _narrateForCurrentScreen(successMessage, interrupt: false);
   }
 
   // Context-aware help message
@@ -2430,10 +2522,7 @@ class VoiceNavigationService {
     try {
       await _tts.stop();
       await _audioManager.stopAllAudio();
-      print('Stopped current speech to listen to user');
-    } catch (e) {
-      print('Error stopping speech: $e');
-    }
+    } catch (e) {}
   }
 
   // Centralized method to handle screen-specific narration
@@ -2448,9 +2537,7 @@ class VoiceNavigationService {
         text,
         interrupt: interrupt,
       );
-    } catch (e) {
-      print('Error narrating for current screen: $e');
-    }
+    } catch (e) {}
   }
 
   // Handle stop speech command
@@ -2462,10 +2549,7 @@ class VoiceNavigationService {
         "Stopped. I'm listening.",
         interrupt: true,
       );
-      print('Speech stopped by user command');
-    } catch (e) {
-      print('Error handling stop speech: $e');
-    }
+    } catch (e) {}
   }
 
   // Handle resume speech command
@@ -2477,10 +2561,7 @@ class VoiceNavigationService {
         currentScreen,
       );
       await _narrateForCurrentScreen("Resuming. $message", interrupt: true);
-      print('Speech resumed by user command');
-    } catch (e) {
-      print('Error handling resume speech: $e');
-    }
+    } catch (e) {}
   }
 
   // Home command handlers

@@ -122,19 +122,30 @@ class LocationService {
       print('Error getting initial position: $e');
     }
 
-    // Start continuous tracking
-    _locationTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+    // Start continuous tracking with reduced frequency to prevent frame skipping
+    _locationTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
       try {
         final position = await Geolocator.getCurrentPosition(
           locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
+            accuracy:
+                LocationAccuracy
+                    .medium, // Reduced accuracy for better performance
           ),
         );
-        _currentPosition = position;
-        _positionController.add(position);
-        await _checkNearbyLandmarks();
+
+        // Only update if position has changed significantly
+        if (_currentPosition == null ||
+            _hasPositionChangedSignificantly(position)) {
+          _currentPosition = position;
+          _positionController.add(position);
+
+          // Throttle landmark checking to reduce workload
+          Future.delayed(const Duration(milliseconds: 500), () {
+            _checkNearbyLandmarks();
+          });
+        }
       } catch (e) {
-        print('Error updating position: $e');
+        // Silent error handling to reduce logging
       }
     });
 
@@ -148,6 +159,21 @@ class LocationService {
     _isTracking = false;
     _locationTimer?.cancel();
     await _tts.speak("Location tracking stopped.");
+  }
+
+  // Check if position has changed significantly to reduce unnecessary updates
+  bool _hasPositionChangedSignificantly(Position newPosition) {
+    if (_currentPosition == null) return true;
+
+    final distance = Geolocator.distanceBetween(
+      _currentPosition!.latitude,
+      _currentPosition!.longitude,
+      newPosition.latitude,
+      newPosition.longitude,
+    );
+
+    // Only consider it significant if moved more than 10 meters
+    return distance > 10.0;
   }
 
   // Check for nearby landmarks and trigger geofencing
@@ -206,7 +232,7 @@ class LocationService {
     }
   }
 
-    // Get current location description
+  // Get current location description
   Future<String> getCurrentLocationDescription() async {
     if (_currentPosition == null) {
       return "Location not available";
@@ -214,7 +240,7 @@ class LocationService {
 
     // In a real app, you'd use reverse geocoding here
     return "You are at coordinates: ${_currentPosition!.latitude.toStringAsFixed(4)}, "
-           "${_currentPosition!.longitude.toStringAsFixed(4)}";
+        "${_currentPosition!.longitude.toStringAsFixed(4)}";
   }
 
   // Get initial position
@@ -224,9 +250,7 @@ class LocationService {
       throw Exception("Location permission not granted.");
     }
     return await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-      ),
+      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
     );
   }
 

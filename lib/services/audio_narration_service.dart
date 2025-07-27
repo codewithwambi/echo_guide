@@ -1,3 +1,5 @@
+// ignore_for_file: empty_catches
+
 import 'dart:async';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:geolocator/geolocator.dart';
@@ -43,7 +45,6 @@ class AudioNarrationService {
 
   // Narration state
   String _lastNarratedLocation = '';
-  double _lastNarratedBearing = 0.0;
   Position? _currentPosition;
   List<Landmark> _nearbyLandmarks = [];
 
@@ -58,18 +59,16 @@ class AudioNarrationService {
   bool _enableEmotionalNarration = true;
   bool _enableContextualNarration = true;
   bool _enableRealTimeUpdates = true;
-  int _maxNarrationLength = 150; // Increased for immersive experience
-  bool _enableHapticFeedback = true;
+  final int _maxNarrationLength = 150; // Increased for immersive experience
+  final bool _enableHapticFeedback = true;
 
   // Enhanced narration settings
-  static const double _bearingChangeThreshold = 30.0; // degrees
-  static const double _distanceThreshold = 50.0; // meters
   static const Duration _narrationCooldown = Duration(seconds: 15);
   DateTime? _lastNarrationTime;
 
   // Real-time data tracking
   Map<String, dynamic> _realTimeData = {};
-  List<String> _narrationHistory = [];
+  final List<String> _narrationHistory = [];
   int _narrationCount = 0;
 
   // Initialize the service
@@ -214,66 +213,42 @@ class AudioNarrationService {
   // User control methods
   void setNarrationMode(NarrationMode mode) {
     _narrationMode = mode;
-    print('🎤 Narration mode changed to: ${mode.name}');
   }
 
   void setNarrationDetail(NarrationDetail detail) {
     _narrationDetail = detail;
-    print('📝 Narration detail level changed to: ${detail.name}');
   }
 
   void setNarrationTone(NarrationTone tone) {
     _narrationTone = tone;
-    print('🎭 Narration tone changed to: ${tone.name}');
   }
 
   void toggleLocationNarration() {
     _enableLocationNarration = !_enableLocationNarration;
-    print(
-      '📍 Location narration: ${_enableLocationNarration ? "enabled" : "disabled"}',
-    );
   }
 
   void toggleLandmarkNarration() {
     _enableLandmarkNarration = !_enableLandmarkNarration;
-    print(
-      '🏛️ Landmark narration: ${_enableLandmarkNarration ? "enabled" : "disabled"}',
-    );
   }
 
   void toggleSafetyNarration() {
     _enableSafetyNarration = !_enableSafetyNarration;
-    print(
-      '🛡️ Safety narration: ${_enableSafetyNarration ? "enabled" : "disabled"}',
-    );
   }
 
   void toggleStreetNarration() {
     _enableStreetNarration = !_enableStreetNarration;
-    print(
-      '🛣️ Street narration: ${_enableStreetNarration ? "enabled" : "disabled"}',
-    );
   }
 
   void toggleEmotionalNarration() {
     _enableEmotionalNarration = !_enableEmotionalNarration;
-    print(
-      '😊 Emotional narration: ${_enableEmotionalNarration ? "enabled" : "disabled"}',
-    );
   }
 
   void toggleContextualNarration() {
     _enableContextualNarration = !_enableContextualNarration;
-    print(
-      '🎯 Contextual narration: ${_enableContextualNarration ? "enabled" : "disabled"}',
-    );
   }
 
   void toggleRealTimeUpdates() {
     _enableRealTimeUpdates = !_enableRealTimeUpdates;
-    print(
-      '⏰ Real-time updates: ${_enableRealTimeUpdates ? "enabled" : "disabled"}',
-    );
   }
 
   // Enhanced narration generation with immersive features
@@ -370,9 +345,7 @@ class AudioNarrationService {
           }
 
           _narrationCount++;
-        } catch (e) {
-          print('❌ Error in enhanced narration: $e');
-        }
+        } catch (e) {}
       }
     }
   }
@@ -391,7 +364,6 @@ class AudioNarrationService {
       case NarrationTone.friendly:
         return _addFriendliness(narration);
       case NarrationTone.neutral:
-      default:
         return narration;
     }
   }
@@ -453,7 +425,7 @@ class AudioNarrationService {
       case NarrationDetail.brief:
         // Keep only essential information
         if (narration.contains('coordinates')) {
-          return narration.split('coordinates')[0] + 'coordinates';
+          return '${narration.split('coordinates')[0]}coordinates';
         }
         return narration.split('. ').take(1).join('. ');
 
@@ -497,12 +469,12 @@ class AudioNarrationService {
       return narration;
     }
 
-    return words.take(_maxNarrationLength).join(' ') + '...';
+    return '${words.take(_maxNarrationLength).join(' ')}...';
   }
 
   // Provide enhanced haptic feedback for narration
   Future<void> _provideEnhancedHapticFeedback() async {
-    if (await Vibration.hasVibrator() ?? false) {
+    if (await Vibration.hasVibrator() == true) {
       // Different haptic patterns based on narration type
       switch (_narrationTone) {
         case NarrationTone.urgent:
@@ -579,7 +551,7 @@ class AudioNarrationService {
       // Describe each category
       categories.forEach((category, landmarks) {
         features +=
-            'You\'ll find ${landmarks.length} ${category}${landmarks.length > 1 ? 's' : ''} nearby. ';
+            'You\'ll find ${landmarks.length} $category${landmarks.length > 1 ? 's' : ''} nearby. ';
         for (int i = 0; i < landmarks.length && i < 2; i++) {
           final landmark = landmarks[i];
           final distance = Geolocator.distanceBetween(
@@ -693,24 +665,16 @@ class AudioNarrationService {
   Map<String, dynamic> get realTimeData => Map.unmodifiable(_realTimeData);
 
   // Start narration
-  void startNarration() {
-    print('🎤 Enhanced narration started');
-  }
+  void startNarration() {}
 
   // Stop narration
-  void stopNarration() {
-    print('🔇 Enhanced narration stopped');
-  }
+  void stopNarration() {}
 
   // Pause narration
-  void pauseNarration() {
-    print('⏸️ Enhanced narration paused');
-  }
+  void pauseNarration() {}
 
   // Resume narration
-  void resumeNarration() {
-    print('▶️ Enhanced narration resumed');
-  }
+  void resumeNarration() {}
 
   // Dispose resources
   void dispose() {

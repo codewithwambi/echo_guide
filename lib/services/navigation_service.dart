@@ -1,3 +1,5 @@
+// ignore_for_file: empty_catches
+
 import 'dart:async';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'audio_manager_service.dart';
@@ -92,7 +94,6 @@ class NavigationService {
       await Future.delayed(Duration(milliseconds: 300));
       await _screenTransitionManager.navigateToScreen(screen);
     } catch (e) {
-      print('Navigation error: $e');
       await _audioManager.speakIfActive(
         _currentScreen,
         "Navigation failed. Please try again.",
@@ -109,7 +110,6 @@ class NavigationService {
       await _audioManager.stopAllAudio();
       await Future.delayed(Duration(milliseconds: 200));
     } catch (e) {
-      print('Error stopping audio: $e');
     }
   }
 

@@ -4,27 +4,28 @@ import 'home_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'downloads_screen.dart';
-//import 'splash_screen.dart';
 import 'onboarding_screen.dart';
 import 'tour_discovery_screen.dart';
 import 'help_and_support_screen.dart';
 import 'services/voice_navigation_service.dart';
 import 'services/audio_manager_service.dart';
 import 'services/screen_transition_manager.dart';
+import 'package:provider/provider.dart';
+import 'providers/app_providers.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Initialize voice navigation service
+  // Initialize voice navigation service globally
   final voiceNavigationService = VoiceNavigationService();
   await voiceNavigationService.initialize();
 
-  // Initialize audio manager service
+  // Initialize audio manager service globally
   final audioManagerService = AudioManagerService();
   await audioManagerService.initialize();
 
-  // Initialize screen transition manager
+  // Initialize screen transition manager globally
   final screenTransitionManager = ScreenTransitionManager();
   await screenTransitionManager.initialize();
 
@@ -39,21 +40,27 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      routes: {
-        '/home': (context) => const HomeScreen(),
-        '/downloads': (context) => const DownloadsScreen(),
-        '/onboarding': (context) => const OnboardingScreen(),
-        '/tourDiscovery': (context) => const TourDiscoveryScreen(),
-        '/helpAndSupport': (context) => const HelpAndSupportScreen(),
-      },
-      title: 'Echo Guide',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => VoiceNavigationProvider()),
+        ChangeNotifierProvider(create: (_) => LocationProvider()),
+      ],
+      child: MaterialApp(
+        routes: {
+          '/home': (context) => const HomeScreen(),
+          '/downloads': (context) => const DownloadsScreen(),
+          '/onboarding': (context) => const OnboardingScreen(),
+          '/tourDiscovery': (context) => const TourDiscoveryScreen(),
+          '/helpAndSupport': (context) => const HelpAndSupportScreen(),
+        },
+        title: 'Echo Guide',
+        theme: ThemeData(
+          primarySwatch: Colors.blue,
+          visualDensity: VisualDensity.adaptivePlatformDensity,
+        ),
+        home: const SplashScreen(),
+        debugShowCheckedModeBanner: false,
       ),
-      home: const SplashScreen(),
-      debugShowCheckedModeBanner: false,
     );
   }
 }
@@ -70,11 +77,6 @@ class _SplashScreenState extends State<SplashScreen>
   late FlutterTts tts;
   late AnimationController _controller;
   late Animation<double> _animation;
-  final VoiceNavigationService _voiceNavigationService =
-      VoiceNavigationService();
-  final AudioManagerService _audioManagerService = AudioManagerService();
-  final ScreenTransitionManager _screenTransitionManager =
-      ScreenTransitionManager();
 
   @override
   void initState() {
@@ -97,7 +99,7 @@ class _SplashScreenState extends State<SplashScreen>
     await _speakWelcome();
 
     // Navigate after the welcome message is complete
-    await Future.delayed(const Duration(seconds: 10));
+    await Future.delayed(const Duration(seconds: 8));
     _navigateToHome();
   }
 
@@ -109,7 +111,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _speakWelcome() async {
     await tts.speak(
-      "Welcome to EchoPath. Your voice-powered journey begins now. I'll guide you through seamless voice navigation between all screens and provide comprehensive map assistance. You can navigate from any screen to any screen using voice commands. Only the active screen will have audio to ensure clear communication. Smooth transitions between screens are now enabled for a better user experience.",
+      "Welcome to Echo Guide. Your voice-powered journey begins now. I'll guide you through seamless voice navigation between all screens and provide comprehensive map assistance. You can navigate from any screen to any screen using voice commands. Only the active screen will have audio to ensure clear communication. Smooth transitions between screens are now enabled for a better user experience.",
     );
   }
 
@@ -149,7 +151,7 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
                 const SizedBox(height: 30),
                 const Text(
-                  "EchoPath",
+                  "Echo Guide",
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 32,

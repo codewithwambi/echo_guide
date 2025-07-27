@@ -33,6 +33,7 @@ class _TourDiscoveryScreenState extends State<TourDiscoveryScreen> {
   StreamSubscription? _navigationCommandSubscription;
   StreamSubscription? _discoverCommandSubscription;
   StreamSubscription? _voiceCommandSubscription;
+  StreamSubscription? _screenNavigationSubscription;
 
   bool _isVoiceInitialized = false;
   bool _isListening = false;
@@ -262,6 +263,13 @@ class _TourDiscoveryScreenState extends State<TourDiscoveryScreen> {
         .listen((command) {
           _handleDiscoverVoiceCommand(command);
         });
+
+    // Listen to screen navigation commands
+    _screenNavigationSubscription = _voiceNavigationService
+        .screenNavigationStream
+        .listen((screen) {
+          _handleScreenNavigation(screen);
+        });
     // Listen to voice status updates
     _voiceStatusSubscription = _voiceNavigationService.voiceStatusStream.listen(
       (status) {
@@ -428,6 +436,13 @@ class _TourDiscoveryScreenState extends State<TourDiscoveryScreen> {
   }
 
   // Handle discover-specific voice commands
+  // Handle screen navigation from voice commands
+  void _handleScreenNavigation(String screen) {
+    debugPrint('Tour discovery screen handling navigation to: $screen');
+    // Use screen transition manager for smooth navigation
+    _screenTransitionManager.handleVoiceNavigation(screen);
+  }
+
   Future<void> _handleDiscoverVoiceCommand(String command) async {
     print('🎤 Discover voice command received: $command');
 
@@ -736,7 +751,11 @@ class _TourDiscoveryScreenState extends State<TourDiscoveryScreen> {
     if (mounted) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => AudioGuideScreen()),
+        MaterialPageRoute(
+          builder:
+              (_) =>
+                  AudioGuideScreen(key: const ValueKey('audio_guide_screen')),
+        ),
       );
     }
 

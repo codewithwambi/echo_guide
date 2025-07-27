@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'dart:developer' as developer;
 import 'dart:async';
 import 'services/audio_manager_service.dart';
@@ -21,24 +22,21 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
   late ScreenTransitionManager _screenTransitionManager;
   late VoiceNavigationService _voiceNavigationService;
 
+  // Audio players for real ambient sound playback
+  late AudioPlayer _ambientPlayer;
+  late AudioPlayer _tourPlayer;
+
   StreamSubscription? _audioControlSubscription;
   StreamSubscription? _screenActivationSubscription;
   StreamSubscription? _transitionSubscription;
-  StreamSubscription? _voiceStatusSubscription;
+
   StreamSubscription? _navigationCommandSubscription;
   StreamSubscription? _downloadsCommandSubscription;
+  StreamSubscription? _screenNavigationSubscription;
 
-  final bool _isVoiceInitialized = false;
-  bool _isListening = false;
-  String _voiceStatus = 'Initializing...';
   bool _isNarrating = false;
 
   // Downloads screen specific voice command state
-  bool _isDownloadsVoiceEnabled = true;
-  bool _isAudioPlaybackMode = false;
-  bool _isDownloadManagementMode = false;
-  String _lastSpokenTour = '';
-  int _commandCount = 0;
   int _currentTourIndex = 0; // Track current tour for next functionality
 
   // Enhanced playback state
@@ -46,12 +44,18 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
   String _pausedTour = '';
   double _playbackProgress = 0.0;
   Timer? _progressTimer;
-  String _currentPlaybackStatus = 'stopped'; // 'playing', 'paused', 'stopped'
 
   // Audio playback state
   bool _isPlaying = false;
   String? _currentlyPlaying;
   Timer? _playbackTimer;
+
+  // Ambient sound state
+  bool _isAmbientMode = false;
+  bool _isAmbientPlaying = false;
+  int _currentAmbientIndex = 0;
+  double _ambientVolume = 0.7;
+  bool _isAmbientLoop = true;
 
   final List<Map<String, dynamic>> _downloads = [
     {
@@ -62,6 +66,26 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       'description':
           'Explore the magnificent Murchison Falls, one of Uganda\'s most spectacular natural wonders.',
       'audioUrl': 'murchison_falls_audio.mp3',
+      'ambientSounds': [
+        {
+          'name': 'Waterfall Ambience',
+          'description': 'The powerful roar of Murchison Falls',
+          'duration': '5:00',
+          'file': 'murchison_waterfall_ambient.mp3',
+        },
+        {
+          'name': 'Forest Birds',
+          'description': 'Chirping birds and forest sounds',
+          'duration': '4:30',
+          'file': 'murchison_birds_ambient.mp3',
+        },
+        {
+          'name': 'River Flow',
+          'description': 'Gentle river sounds and water flow',
+          'duration': '6:15',
+          'file': 'murchison_river_ambient.mp3',
+        },
+      ],
     },
     {
       'name': 'Kasubi Tombs',
@@ -71,6 +95,26 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       'description':
           'Discover the royal tombs of the Buganda kingdom, a UNESCO World Heritage site.',
       'audioUrl': 'kasubi_tombs_audio.mp3',
+      'ambientSounds': [
+        {
+          'name': 'Traditional Drums',
+          'description': 'Traditional Buganda drumming and music',
+          'duration': '3:45',
+          'file': 'kasubi_drums_ambient.mp3',
+        },
+        {
+          'name': 'Cultural Chants',
+          'description': 'Traditional chants and cultural sounds',
+          'duration': '4:20',
+          'file': 'kasubi_chants_ambient.mp3',
+        },
+        {
+          'name': 'Sacred Silence',
+          'description': 'Peaceful atmosphere of the sacred site',
+          'duration': '5:10',
+          'file': 'kasubi_silence_ambient.mp3',
+        },
+      ],
     },
     {
       'name': 'Bwindi Impenetrable Forest',
@@ -80,6 +124,26 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       'description':
           'Experience the mystical Bwindi forest, home to endangered mountain gorillas.',
       'audioUrl': 'bwindi_forest_audio.mp3',
+      'ambientSounds': [
+        {
+          'name': 'Gorilla Sounds',
+          'description': 'Distant gorilla calls and movements',
+          'duration': '4:15',
+          'file': 'bwindi_gorillas_ambient.mp3',
+        },
+        {
+          'name': 'Forest Ambience',
+          'description': 'Dense forest sounds and wildlife',
+          'duration': '6:30',
+          'file': 'bwindi_forest_ambient.mp3',
+        },
+        {
+          'name': 'Mountain Stream',
+          'description': 'Flowing mountain streams and water',
+          'duration': '5:45',
+          'file': 'bwindi_stream_ambient.mp3',
+        },
+      ],
     },
     {
       'name': 'Lake Victoria Tour',
@@ -89,13 +153,82 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       'description':
           'Journey around Africa\'s largest lake, exploring its islands and fishing communities.',
       'audioUrl': 'lake_victoria_audio.mp3',
+      'ambientSounds': [
+        {
+          'name': 'Lake Waves',
+          'description': 'Gentle waves lapping against the shore',
+          'duration': '4:50',
+          'file': 'lake_victoria_waves_ambient.mp3',
+        },
+        {
+          'name': 'Fishing Village',
+          'description': 'Sounds of fishing activities and village life',
+          'duration': '5:25',
+          'file': 'lake_victoria_village_ambient.mp3',
+        },
+        {
+          'name': 'Boat Journey',
+          'description': 'Boat engine and water journey sounds',
+          'duration': '6:00',
+          'file': 'lake_victoria_boat_ambient.mp3',
+        },
+      ],
     },
   ];
 
   @override
   void initState() {
     super.initState();
+    _initAudioPlayers();
     _initServices();
+  }
+
+  Future<void> _initAudioPlayers() async {
+    _ambientPlayer = AudioPlayer();
+    _tourPlayer = AudioPlayer();
+
+    // Set up ambient player event listeners
+    _ambientPlayer.onPlayerStateChanged.listen((PlayerState state) {
+      if (mounted) {
+        setState(() {
+          _isAmbientPlaying = state == PlayerState.playing;
+        });
+      }
+    });
+
+    _ambientPlayer.onPlayerComplete.listen((event) {
+      if (mounted && _isAmbientLoop) {
+        // Loop the ambient sound
+        _playCurrentAmbientSound();
+      } else {
+        setState(() {
+          _isAmbientPlaying = false;
+        });
+      }
+    });
+
+    // Set up tour player event listeners
+    _tourPlayer.onPlayerStateChanged.listen((PlayerState state) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = state == PlayerState.playing;
+        });
+      }
+    });
+
+    _tourPlayer.onPlayerComplete.listen((event) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = false;
+          _currentlyPlaying = null;
+          _playbackProgress = 0.0;
+        });
+        _audioManagerService.speakIfActive(
+          'downloads',
+          "Tour playback completed. Say 'play another tour' or 'go back' to return to home.",
+        );
+      }
+    });
   }
 
   Future<void> _initServices() async {
@@ -115,10 +248,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       await _initializeVoiceNavigation();
       await _activateDownloadsAudio();
     } catch (e) {
-      print('Error initializing downloads screen services: $e');
-      setState(() {
-        _voiceStatus = 'Error initializing services';
-      });
+      debugPrint('Error initializing downloads screen: $e');
     }
   }
 
@@ -130,7 +260,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       // Start automatic narration
       await _startAutomaticNarration();
     } catch (e) {
-      print('Error activating downloads audio: $e');
+      debugPrint('Error activating downloads audio: $e');
     }
   }
 
@@ -139,11 +269,35 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       _isNarrating = true;
     });
 
-    // Enhanced welcome message with offline content focus
-    await _audioManagerService.speakIfActive(
-      'downloads',
-      "Welcome to your Offline Content Library! Here you can access all your downloaded tours and audio guides without needing internet. I'll help you explore, play, and manage your offline content with simple voice commands.",
-    );
+    // Enhanced welcome message for blind users
+    String welcomeMessage = "Welcome to your downloads screen! ";
+    welcomeMessage +=
+        "You have access to immersive tour experiences with authentic ambient sounds. ";
+
+    // Count available tours
+    int downloadedTours =
+        _downloads.where((tour) => tour['status'] == 'Downloaded').length;
+    int totalTours = _downloads.length;
+
+    welcomeMessage +=
+        "You have $downloadedTours out of $totalTours tours downloaded and ready to play. ";
+
+    if (downloadedTours > 0) {
+      welcomeMessage +=
+          "Say 'select one' through 'select four' to choose a tour, or just say 'one', 'two', 'three', 'four'. ";
+      welcomeMessage +=
+          "You can also say 'select murchison', 'select kasubi', 'select bwindi', or 'select lake victoria'. ";
+      welcomeMessage +=
+          "Once selected, say 'play' to start the tour immediately. ";
+    } else {
+      welcomeMessage +=
+          "Say 'download all' to get all tours ready for offline listening. ";
+    }
+
+    welcomeMessage +=
+        "Say 'list tours' to hear all options, 'help' for complete instructions, or 'go back' to return to the main menu.";
+
+    await _audioManagerService.speakIfActive('downloads', welcomeMessage);
 
     // Brief pause for user to process
     await Future.delayed(Duration(seconds: 1));
@@ -162,8 +316,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     int availableCount =
         _downloads.where((d) => d['status'] == 'Available').length;
 
-    String downloadList =
-        "You have $downloadedCount offline tours ready to play and $availableCount available for download. ";
+    String downloadList = "Here are your available tours: ";
 
     for (int i = 0; i < _downloads.length; i++) {
       final download = _downloads[i];
@@ -171,12 +324,25 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
           download['status'] == 'Downloaded'
               ? 'ready to play'
               : download['status'];
-      downloadList +=
+      String tourInfo =
           "${i + 1}. ${download['name']}, $status, ${download['duration']}. ${download['description']} ";
+
+      // Add ambient sound information
+      if (download['status'] == 'Downloaded' &&
+          download['ambientSounds'] != null) {
+        List<Map<String, dynamic>> ambientSounds =
+            List<Map<String, dynamic>>.from(download['ambientSounds']);
+        tourInfo +=
+            "Includes ${ambientSounds.length} ambient sounds for immersive experience. ";
+      }
+
+      downloadList += tourInfo;
     }
 
     downloadList +=
-        "Say 'one' through 'four' to select and play specific tours, 'play' to start current tour, 'pause' to pause, 'next' for next tour, 'previous' for previous tour, 'repeat' to hear again, or 'go back' to return.";
+        "Summary: $downloadedCount tours ready to play, $availableCount available for download. ";
+    downloadList +=
+        "Say 'select one' through 'select four' to choose a tour, 'play' to start current tour, 'next' or 'previous' to navigate, 'ambient' for background sounds, 'help' for all commands, or 'go back' to return.";
 
     await _audioManagerService.speakIfActive('downloads', downloadList);
   }
@@ -213,22 +379,16 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
   Future<void> _registerWithAudioManager() async {
     _audioManagerService.registerScreen('downloads', tts, speech);
 
-    _audioControlSubscription = _audioManagerService.audioControlStream.listen((
-      event,
-    ) {
-      print('Downloads screen audio control event: $event');
-    });
+    _audioControlSubscription = _audioManagerService.audioControlStream.listen(
+      (event) {},
+    );
 
     _screenActivationSubscription = _audioManagerService.screenActivationStream
-        .listen((screenId) {
-          print('Downloads screen activation event: $screenId');
-        });
+        .listen((screenId) {});
 
-    _transitionSubscription = _screenTransitionManager.transitionStream.listen((
-      event,
-    ) {
-      print('Downloads screen transition event: $event');
-    });
+    _transitionSubscription = _screenTransitionManager.transitionStream.listen(
+      (event) {},
+    );
   }
 
   Future<void> _initializeVoiceNavigation() async {
@@ -239,31 +399,22 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
           _handleDownloadsVoiceCommand(command);
         });
 
-    // Listen to voice status updates
-    _voiceStatusSubscription = _voiceNavigationService.voiceStatusStream.listen(
-      (status) {
-        setState(() {
-          _voiceStatus = status;
-          if (status.startsWith('listening_started')) {
-            _isListening = true;
-          } else if (status.startsWith('listening_stopped')) {
-            _isListening = false;
-          }
+    // Listen to screen navigation commands
+    _screenNavigationSubscription = _voiceNavigationService
+        .screenNavigationStream
+        .listen((screen) {
+          _handleScreenNavigation(screen);
         });
-      },
-    );
 
     // Listen to navigation commands
     _navigationCommandSubscription = _voiceNavigationService
         .navigationCommandStream
         .listen((command) {
-          print('Downloads screen navigation command: $command');
           _handleNavigationCommand(command);
         });
 
     // Listen to navigation commands for tour actions
     _voiceNavigationService.navigationCommandStream.listen((command) {
-      print('Downloads screen tour command: $command');
       _handleTourCommand(command);
     });
   }
@@ -293,106 +444,232 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     }
   }
 
-  // Handle downloads-specific voice commands
+  // Handle screen navigation from voice commands
+  void _handleScreenNavigation(String screen) {
+    debugPrint('Downloads screen handling navigation to: $screen');
+    // Use screen transition manager for smooth navigation
+    _screenTransitionManager.handleVoiceNavigation(screen);
+  }
+
+  // Enhanced voice commands for blind users
   Future<void> _handleDownloadsVoiceCommand(String command) async {
-    print('🎤 Downloads voice command received: $command');
-
-    // Limit command frequency to prevent spam
-    if (_commandCount > 10) {
-      _commandCount = 0;
-      return;
+    // Enhanced tour selection with natural language
+    if (command.contains('select') || command.contains('choose')) {
+      if (command.contains('one') ||
+          command.contains('1') ||
+          command.contains('first') ||
+          command.contains('murchison')) {
+        await _selectAndPlayTour(0);
+      } else if (command.contains('two') ||
+          command.contains('2') ||
+          command.contains('second') ||
+          command.contains('kasubi')) {
+        await _selectAndPlayTour(1);
+      } else if (command.contains('three') ||
+          command.contains('3') ||
+          command.contains('third') ||
+          command.contains('bwindi')) {
+        await _selectAndPlayTour(2);
+      } else if (command.contains('four') ||
+          command.contains('4') ||
+          command.contains('fourth') ||
+          command.contains('lake') ||
+          command.contains('victoria')) {
+        await _selectAndPlayTour(3);
+      } else {
+        await _speakAvailableDownloads();
+      }
     }
-    _commandCount++;
-
-    // Simple number commands for quick access to specific tours
-    if (command == 'one' || command == '1' || command == 'first') {
-      await _playTourByNumber(0);
+    // Direct number commands for quick access
+    else if (command == 'one' || command == '1' || command == 'first') {
+      await _selectAndPlayTour(0);
     } else if (command == 'two' || command == '2' || command == 'second') {
-      await _playTourByNumber(1);
+      await _selectAndPlayTour(1);
     } else if (command == 'three' || command == '3' || command == 'third') {
-      await _playTourByNumber(2);
+      await _selectAndPlayTour(2);
     } else if (command == 'four' || command == '4' || command == 'fourth') {
-      await _playTourByNumber(3);
-    } else if (command.startsWith('play_tour:')) {
-      String tourName = command.split(':').last;
-      await _handlePlayTourCommand(tourName);
-    } else if (command == 'play' ||
-        command == 'start' ||
-        command == 'start tour') {
-      await _handlePlayCurrentTourCommand();
-    } else if (command == 'stop_tour' || command == 'stop') {
-      await _handleStopTourCommand();
-    } else if (command == 'pause_tour' ||
-        command == 'pause' ||
-        command == 'pause tour') {
-      await _handlePauseTourCommand();
-    } else if (command == 'resume' ||
-        command == 'resume tour' ||
-        command == 'continue') {
+      await _selectAndPlayTour(3);
+    }
+    // Enhanced playback controls
+    else if (command.contains('play') ||
+        command.contains('start') ||
+        command.contains('begin')) {
+      if (command.contains('current') || command.contains('selected')) {
+        await _handlePlayCurrentTourCommand();
+      } else if (_currentTourIndex >= 0) {
+        await _handlePlayCurrentTourCommand();
+      } else {
+        await _audioManagerService.speakIfActive(
+          'downloads',
+          "No tour selected. Say 'select one' through 'select four' to choose a tour first, or 'list tours' to hear all options.",
+        );
+      }
+    }
+    // Enhanced pause controls
+    else if (command.contains('pause') ||
+        command.contains('stop') ||
+        command.contains('halt')) {
+      if (command.contains('pause') || command.contains('temporary')) {
+        await _handlePauseTourCommand();
+      } else {
+        await _stopPlayback();
+      }
+    }
+    // Enhanced resume controls
+    else if (command.contains('resume') ||
+        command.contains('continue') ||
+        command.contains('unpause') ||
+        command.contains('restart')) {
       await _resumePlayback();
-    } else if (command.startsWith('playback_control:')) {
-      String action = command.split(':').last;
-      await _handlePlaybackControlCommand(action);
-    } else if (command == 'playback_status' || command == 'what is playing') {
-      await _handlePlaybackStatusCommand();
-    } else if (command.startsWith('volume_control:')) {
-      String action = command.split(':').last;
-      await _handleVolumeControlCommand(action);
-    } else if (command.startsWith('speed_control:')) {
-      String action = command.split(':').last;
-      await _handleSpeedControlCommand(action);
-    } else if (command == 'download_all' || command == 'download all') {
-      await _handleDownloadAllCommand();
-    } else if (command == 'delete_downloads' || command == 'delete downloads') {
-      await _handleDeleteDownloadsCommand();
-    } else if (command == 'show_downloads' || command == 'list downloads') {
-      await _speakAvailableDownloads();
-    } else if (command == 'next' || command == 'next tour') {
+    }
+    // Enhanced navigation
+    else if (command.contains('next') ||
+        command.contains('forward') ||
+        command.contains('skip')) {
       await _nextTour();
-    } else if (command == 'previous' || command == 'previous tour') {
+    } else if (command.contains('previous') ||
+        command.contains('back') ||
+        command.contains('last')) {
       await _previousTour();
-    } else if (command == 'repeat' || command == 'read all') {
+    }
+    // Enhanced status and information
+    else if (command.contains('status') ||
+        command.contains('what') ||
+        command.contains('current') ||
+        command.contains('playing')) {
+      await _handlePlaybackStatusCommand();
+    } else if (command.contains('list') ||
+        command.contains('show') ||
+        command.contains('tours') ||
+        command.contains('options')) {
       await _speakAvailableDownloads();
-    } else if (command == 'stop talking' || command == 'pause narration') {
-      await _audioManagerService.stopAllAudio();
-    } else if (command == 'resume talking' || command == 'continue narration') {
+    } else if (command.contains('repeat') ||
+        command.contains('again') ||
+        command.contains('read')) {
       await _speakAvailableDownloads();
-    } else if (command == 'go back' || command == 'back') {
+    }
+    // Enhanced download management
+    else if (command.contains('download') || command.contains('get')) {
+      if (command.contains('all') || command.contains('everything')) {
+        await _downloadAll();
+      } else {
+        await _audioManagerService.speakIfActive(
+          'downloads',
+          "Say 'download all' to get all tours, or 'list tours' to see what's available.",
+        );
+      }
+    } else if (command.contains('delete') ||
+        command.contains('remove') ||
+        command.contains('clear')) {
+      await _deleteDownloads();
+    }
+    // Enhanced volume and speed controls
+    else if (command.contains('volume') ||
+        command.contains('loud') ||
+        command.contains('quiet')) {
+      await _handleVolumeControlCommand(command);
+    } else if (command.contains('speed') ||
+        command.contains('fast') ||
+        command.contains('slow')) {
+      await _handleSpeedControlCommand(command);
+    }
+    // Enhanced navigation
+    else if (command.contains('go back') ||
+        command.contains('return') ||
+        command.contains('exit') ||
+        command.contains('home')) {
       await _navigateBack();
-    } else if (command.startsWith('help')) {
+    }
+    // Enhanced help
+    else if (command.contains('help') ||
+        command.contains('assist') ||
+        command.contains('guide')) {
       await _handleDownloadsHelpCommand();
-    } else {
-      // Unknown command - provide helpful feedback
-      await _audioManagerService.speakIfActive(
-        'downloads',
-        "Say 'one' through 'four' to select and play specific tours, 'play' to start current tour, 'pause' to pause, 'next' for next tour, 'previous' for previous tour, 'repeat' to hear options again, or 'go back' to return.",
-      );
+    }
+    // Enhanced ambient sound controls
+    else if (command.contains('ambient') ||
+        command.contains('atmosphere') ||
+        command.contains('background') ||
+        command.contains('sound') ||
+        command.contains('ambient volume') ||
+        command.contains('loop ambient')) {
+      await _handleAmbientSoundCommand(command);
+    }
+    // Enhanced silence controls
+    else if (command.contains('silence') ||
+        command.contains('quiet') ||
+        command.contains('mute') ||
+        command.contains('stop talking')) {
+      await _audioManagerService.stopAllAudio();
+    }
+    // Unknown command - provide helpful feedback
+    else {
+      await _provideContextualHelp();
     }
   }
 
-  Future<void> _playTourByNumber(int index) async {
+  // Enhanced tour selection and playback for blind users
+  Future<void> _selectAndPlayTour(int index) async {
     if (index >= 0 && index < _downloads.length) {
       _currentTourIndex = index;
       final tour = _downloads[index];
 
       if (tour['status'] == 'Downloaded') {
+        // Provide immediate feedback and start playing
         await _audioManagerService.speakIfActive(
           'downloads',
-          "Selected ${tour['name']}. ${tour['description']} Say 'play' to start, 'pause' to pause, 'next' for next tour, 'previous' for previous tour, or 'repeat' to hear options again.",
+          "Selected and starting ${tour['name']}. ${tour['description']}",
         );
         _playTour(tour['name']);
+
+        // Provide additional controls after a brief pause
+        await Future.delayed(Duration(seconds: 2));
+        await _audioManagerService.speakIfActive(
+          'downloads',
+          "Tour is now playing. Say 'pause' to pause, 'stop' to stop, 'next' for next tour, 'previous' for previous tour, 'ambient' for background sounds, or 'status' to check progress.",
+        );
       } else {
         await _audioManagerService.speakIfActive(
           'downloads',
-          "${tour['name']} is ${tour['status']}. Say 'download all' to get all tours, or select another tour with 'one' through 'four'.",
+          "${tour['name']} is ${tour['status']}. Say 'download all' to get all tours, or 'select' followed by another tour name.",
         );
       }
     } else {
       await _audioManagerService.speakIfActive(
         'downloads',
-        "Tour number ${index + 1} not available. Say 'repeat' to see options.",
+        "Tour not available. Say 'list tours' to hear all options, or 'select' followed by a tour name.",
       );
     }
+  }
+
+  // Enhanced contextual help for blind users
+  Future<void> _provideContextualHelp() async {
+    String helpMessage =
+        "I didn't understand that command. Here's what you can do: ";
+
+    if (_currentTourIndex >= 0 && _currentTourIndex < _downloads.length) {
+      final tour = _downloads[_currentTourIndex];
+      helpMessage += "You have ${tour['name']} selected. ";
+
+      if (_isPlaying) {
+        helpMessage +=
+            "Tour is currently playing. Say 'pause' to pause, 'stop' to stop, or 'status' to check progress. ";
+      } else if (_isPaused) {
+        helpMessage +=
+            "Tour is paused. Say 'resume' to continue, 'stop' to stop, or 'play' to restart. ";
+      } else {
+        helpMessage +=
+            "Say 'play' to start the tour, 'next' for next tour, or 'previous' for previous tour. ";
+      }
+    } else {
+      helpMessage +=
+          "No tour selected. Say 'select one' through 'select four' to choose a tour, or 'list tours' to hear all options. ";
+    }
+
+    helpMessage +=
+        "You can also say 'ambient' for background sounds, 'volume' to adjust volume, 'speed' to change playback speed, or 'help' for full instructions.";
+
+    await _audioManagerService.speakIfActive('downloads', helpMessage);
   }
 
   // Downloads command handlers
@@ -412,37 +689,62 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     }
   }
 
-  Future<void> _handlePlayTourCommand(String tourName) async {
-    await _audioManagerService.speakIfActive('downloads', "Playing $tourName.");
-    _playTour(tourName);
-  }
-
-  Future<void> _handleStopTourCommand() async {
-    await _audioManagerService.speakIfActive('downloads', "Stopped.");
-    _stopPlayback();
-  }
-
-  Future<void> _handleDownloadAllCommand() async {
-    await _audioManagerService.speakIfActive(
-      'downloads',
-      "Downloading all tours.",
-    );
-    _downloadAll();
-  }
-
-  Future<void> _handleDeleteDownloadsCommand() async {
-    await _audioManagerService.speakIfActive(
-      'downloads',
-      "Deleting downloads.",
-    );
-    _deleteDownloads();
-  }
-
   Future<void> _handleDownloadsHelpCommand() async {
-    await _audioManagerService.speakIfActive(
-      'downloads',
-      "Downloads commands: 'one' through 'four' for specific tours, 'play' to start, 'pause' to pause, 'stop' to stop, 'repeat' to hear again, 'download all' to get all tours, 'go back' to return.",
-    );
+    String helpMessage = "Here are all the voice commands for your downloads: ";
+
+    // Tour selection
+    helpMessage +=
+        "To select tours, say 'select one' through 'select four', or just say 'one', 'two', 'three', 'four'. ";
+    helpMessage +=
+        "You can also say 'select murchison', 'select kasubi', 'select bwindi', or 'select lake victoria'. ";
+
+    // Playback controls
+    helpMessage +=
+        "To control playback, say 'play' or 'start' to begin, 'pause' to pause temporarily, 'stop' to stop completely. ";
+    helpMessage +=
+        "Say 'resume' or 'continue' to unpause, 'restart' to start over. ";
+
+    // Navigation
+    helpMessage +=
+        "To navigate, say 'next' or 'forward' for the next tour, 'previous' or 'back' for the previous tour. ";
+    helpMessage += "Say 'skip' to jump to the next tour. ";
+
+    // Status and information
+    helpMessage +=
+        "To get information, say 'status' or 'what's playing' to check current playback. ";
+    helpMessage +=
+        "Say 'list tours' or 'show options' to hear all available tours. ";
+    helpMessage += "Say 'repeat' or 'read again' to hear the tour list again. ";
+
+    // Ambient sounds
+    helpMessage +=
+        "For ambient sounds, say 'ambient' to start background sounds, 'next ambient' or 'previous ambient' to switch sounds. ";
+    helpMessage +=
+        "Say 'stop ambient' to stop, 'ambient volume up' or 'down' to adjust volume. ";
+    helpMessage +=
+        "Say 'list ambient' to hear all ambient options, 'loop ambient' to toggle continuous playback. ";
+
+    // Volume and speed
+    helpMessage +=
+        "For volume control, say 'volume up' or 'louder' to increase, 'volume down' or 'quieter' to decrease. ";
+    helpMessage += "Say 'mute' to silence, 'unmute' to restore sound. ";
+    helpMessage +=
+        "For speed control, say 'speed up' or 'faster' to increase, 'speed down' or 'slower' to decrease. ";
+    helpMessage += "Say 'normal speed' to reset to default. ";
+
+    // Download management
+    helpMessage +=
+        "To manage downloads, say 'download all' to get all tours, 'delete downloads' to remove them. ";
+
+    // Navigation
+    helpMessage +=
+        "Say 'go back' or 'return' to go back to the previous screen. ";
+
+    // Contextual help
+    helpMessage +=
+        "If you're unsure what to say, just ask for 'help' anytime, or say 'what can I do' for suggestions. ";
+
+    await _audioManagerService.speakIfActive('downloads', helpMessage);
   }
 
   Future<void> _handlePauseTourCommand() async {
@@ -460,64 +762,136 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     }
   }
 
-  Future<void> _handlePlaybackControlCommand(String action) async {
-    if (action == 'next') {
-      await _playNextTour();
-    } else if (action == 'previous') {
-      await _playPreviousTour();
+  Future<void> _handlePlaybackStatusCommand() async {
+    if (_isPlaying && _currentlyPlaying != null) {
+      String statusMessage = "Currently playing: $_currentlyPlaying. ";
+      statusMessage +=
+          "Progress: ${(_playbackProgress * 100).toStringAsFixed(0)}% complete. ";
+
+      if (_isAmbientMode && _isAmbientPlaying) {
+        statusMessage += "Ambient sounds are also playing. ";
+      }
+
+      statusMessage +=
+          "Say 'pause' to pause, 'stop' to stop, 'next' for next tour, or 'status' to check again.";
+
+      await _audioManagerService.speakIfActive('downloads', statusMessage);
+    } else if (_isPaused && _pausedTour.isNotEmpty) {
+      String statusMessage = "Tour is paused: $_pausedTour. ";
+      statusMessage +=
+          "Progress: ${(_playbackProgress * 100).toStringAsFixed(0)}% complete. ";
+      statusMessage +=
+          "Say 'resume' to continue, 'stop' to stop completely, or 'play' to restart.";
+
+      await _audioManagerService.speakIfActive('downloads', statusMessage);
+    } else if (_currentTourIndex >= 0 &&
+        _currentTourIndex < _downloads.length) {
+      final tour = _downloads[_currentTourIndex];
+      String statusMessage = "No tour is currently playing. ";
+      statusMessage += "You have ${tour['name']} selected. ";
+      statusMessage +=
+          "Say 'play' to start this tour, 'next' for next tour, 'previous' for previous tour, or 'list tours' to see all options.";
+
+      await _audioManagerService.speakIfActive('downloads', statusMessage);
+    } else {
+      String statusMessage = "No tour is currently playing or selected. ";
+      statusMessage +=
+          "Say 'select one' through 'select four' to choose a tour, or 'list tours' to hear all available options.";
+
+      await _audioManagerService.speakIfActive('downloads', statusMessage);
     }
   }
 
-  Future<void> _handlePlaybackStatusCommand() async {
-    if (_isPlaying && _currentlyPlaying != null) {
+  Future<void> _handleVolumeControlCommand(String command) async {
+    if (command.contains('up') ||
+        command.contains('increase') ||
+        command.contains('louder') ||
+        command.contains('higher')) {
       await _audioManagerService.speakIfActive(
         'downloads',
-        "Playing $_currentlyPlaying. ${(_playbackProgress * 100).toStringAsFixed(0)}% done.",
+        "Volume increased. Say 'volume down' to lower it, or 'mute' to silence.",
       );
-    } else if (_isPaused && _pausedTour.isNotEmpty) {
+    } else if (command.contains('down') ||
+        command.contains('decrease') ||
+        command.contains('quieter') ||
+        command.contains('lower')) {
       await _audioManagerService.speakIfActive(
         'downloads',
-        "Paused: $_pausedTour. Say 'resume' to continue.",
+        "Volume decreased. Say 'volume up' to raise it, or 'mute' to silence.",
+      );
+    } else if (command.contains('mute') ||
+        command.contains('silence') ||
+        command.contains('quiet')) {
+      await _audioManagerService.speakIfActive(
+        'downloads',
+        "Audio muted. Say 'unmute' or 'volume up' to restore sound.",
+      );
+    } else if (command.contains('unmute') ||
+        command.contains('restore') ||
+        command.contains('sound')) {
+      await _audioManagerService.speakIfActive(
+        'downloads',
+        "Audio restored. Say 'volume up' or 'volume down' to adjust.",
+      );
+    } else if (command.contains('maximum') ||
+        command.contains('full') ||
+        command.contains('loudest')) {
+      await _audioManagerService.speakIfActive(
+        'downloads',
+        "Volume set to maximum. Say 'volume down' to lower it.",
+      );
+    } else if (command.contains('minimum') || command.contains('lowest')) {
+      await _audioManagerService.speakIfActive(
+        'downloads',
+        "Volume set to minimum. Say 'volume up' to raise it.",
       );
     } else {
       await _audioManagerService.speakIfActive(
         'downloads',
-        "Nothing playing. Say 'one', 'two', 'three', 'four' to start.",
+        "Say 'volume up' to increase, 'volume down' to decrease, or 'mute' to silence.",
       );
     }
   }
 
-  Future<void> _handleVolumeControlCommand(String action) async {
-    switch (action) {
-      case 'up':
-        await _audioManagerService.speakIfActive('downloads', "Volume up.");
-        break;
-      case 'down':
-        await _audioManagerService.speakIfActive('downloads', "Volume down.");
-        break;
-      case 'mute':
-        await _audioManagerService.speakIfActive(
-          'downloads',
-          "Muted. Say 'unmute' to restore.",
-        );
-        break;
-      case 'unmute':
-        await _audioManagerService.speakIfActive('downloads', "Unmuted.");
-        break;
-    }
-  }
-
-  Future<void> _handleSpeedControlCommand(String action) async {
-    switch (action) {
-      case 'up':
-        await _audioManagerService.speakIfActive('downloads', "Speed up.");
-        break;
-      case 'down':
-        await _audioManagerService.speakIfActive('downloads', "Speed down.");
-        break;
-      case 'normal':
-        await _audioManagerService.speakIfActive('downloads', "Normal speed.");
-        break;
+  Future<void> _handleSpeedControlCommand(String command) async {
+    if (command.contains('up') ||
+        command.contains('increase') ||
+        command.contains('faster') ||
+        command.contains('speed up')) {
+      await _audioManagerService.speakIfActive(
+        'downloads',
+        "Playback speed increased. Say 'speed down' to slow it down, or 'normal speed' to reset.",
+      );
+    } else if (command.contains('down') ||
+        command.contains('decrease') ||
+        command.contains('slower') ||
+        command.contains('speed down')) {
+      await _audioManagerService.speakIfActive(
+        'downloads',
+        "Playback speed decreased. Say 'speed up' to make it faster, or 'normal speed' to reset.",
+      );
+    } else if (command.contains('normal') ||
+        command.contains('reset') ||
+        command.contains('default')) {
+      await _audioManagerService.speakIfActive(
+        'downloads',
+        "Playback speed reset to normal. Say 'speed up' to make it faster, or 'speed down' to slow it down.",
+      );
+    } else if (command.contains('fast') || command.contains('quick')) {
+      await _audioManagerService.speakIfActive(
+        'downloads',
+        "Playback speed set to fast. Say 'normal speed' to reset, or 'speed down' to slow it down.",
+      );
+    } else if (command.contains('slow') || command.contains('slowly')) {
+      await _audioManagerService.speakIfActive(
+        'downloads',
+        "Playback speed set to slow. Say 'normal speed' to reset, or 'speed up' to make it faster.",
+      );
+    } else {
+      await _audioManagerService.speakIfActive(
+        'downloads',
+        "Say 'speed up' to make it faster, 'speed down' to slow it down, or 'normal speed' to reset.",
+      );
     }
   }
 
@@ -531,38 +905,277 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     }
   }
 
-  // User control methods for next/previous tour navigation
-  Future<void> _nextTour() async {
-    _currentTourIndex = (_currentTourIndex + 1) % _downloads.length;
-    final tour = _downloads[_currentTourIndex];
+  // Ambient sound methods
+  Future<void> _handleAmbientSoundCommand(String command) async {
+    if (command.contains('ambient') ||
+        command.contains('atmosphere') ||
+        command.contains('background')) {
+      await _toggleAmbientMode();
+    } else if (command.contains('next ambient') ||
+        command.contains('next sound')) {
+      await _nextAmbientSound();
+    } else if (command.contains('previous ambient') ||
+        command.contains('previous sound')) {
+      await _previousAmbientSound();
+    } else if (command.contains('stop ambient') ||
+        command.contains('stop background')) {
+      await _stopAmbientSound();
+    } else if (command.contains('ambient volume') ||
+        command.contains('background volume')) {
+      await _adjustAmbientVolume(command);
+    } else if (command.contains('loop ambient') ||
+        command.contains('repeat ambient')) {
+      await _toggleAmbientLoop();
+    } else if (command.contains('list ambient') ||
+        command.contains('ambient sounds')) {
+      await _listAmbientSounds();
+    }
+  }
 
-    if (tour['status'] == 'Downloaded') {
-      await _audioManagerService.speakIfActive(
-        'downloads',
-        "Next tour: ${tour['name']}. ${tour['description']}. Say 'play' to start, 'next' for next tour, 'previous' for previous tour, or 'repeat' to hear options.",
-      );
+  Future<void> _toggleAmbientMode() async {
+    if (_currentTourIndex >= 0 && _currentTourIndex < _downloads.length) {
+      final tour = _downloads[_currentTourIndex];
+      final ambientSounds = tour['ambientSounds'] as List<dynamic>?;
+
+      if (ambientSounds != null && ambientSounds.isNotEmpty) {
+        _isAmbientMode = !_isAmbientMode;
+
+        if (_isAmbientMode) {
+          _currentAmbientIndex = 0;
+          await _playAmbientSound(ambientSounds[0]);
+          await _audioManagerService.speakIfActive(
+            'downloads',
+            "Ambient mode activated. Playing ${ambientSounds[0]['name']} for ${tour['name']}. Say 'next ambient' to change sounds, 'stop ambient' to stop, or 'list ambient' to hear all options.",
+          );
+        } else {
+          await _stopAmbientSound();
+          await _audioManagerService.speakIfActive(
+            'downloads',
+            "Ambient mode deactivated.",
+          );
+        }
+      } else {
+        await _audioManagerService.speakIfActive(
+          'downloads',
+          "No ambient sounds available for this tour. Select a different tour with 'one' through 'four'.",
+        );
+      }
     } else {
       await _audioManagerService.speakIfActive(
         'downloads',
-        "Next tour: ${tour['name']} is ${tour['status']}. Say 'play' to start if available, 'next' for next tour, 'previous' for previous tour, or 'repeat' to hear options.",
+        "Please select a tour first with 'one' through 'four' to access ambient sounds.",
+      );
+    }
+  }
+
+  Future<void> _playAmbientSound(Map<String, dynamic> ambientSound) async {
+    _isAmbientPlaying = true;
+
+    try {
+      // Play the actual ambient sound file
+      String fileName = ambientSound['file'];
+      await _playAmbientSoundFile(fileName);
+
+      await _audioManagerService.speakIfActive(
+        'downloads',
+        "Playing ${ambientSound['name']}: ${ambientSound['description']}",
+      );
+    } catch (e) {
+      debugPrint('Error playing ambient sound: $e');
+      await _audioManagerService.speakIfActive(
+        'downloads',
+        "Error playing ambient sound. Please try again.",
+      );
+    }
+  }
+
+  Future<void> _playCurrentAmbientSound() async {
+    if (_currentTourIndex >= 0 && _currentTourIndex < _downloads.length) {
+      final tour = _downloads[_currentTourIndex];
+      final ambientSounds = tour['ambientSounds'] as List<dynamic>?;
+
+      if (ambientSounds != null &&
+          _currentAmbientIndex >= 0 &&
+          _currentAmbientIndex < ambientSounds.length) {
+        await _playAmbientSound(ambientSounds[_currentAmbientIndex]);
+      }
+    }
+  }
+
+  Future<void> _nextAmbientSound() async {
+    if (_currentTourIndex >= 0 && _currentTourIndex < _downloads.length) {
+      final tour = _downloads[_currentTourIndex];
+      final ambientSounds = tour['ambientSounds'] as List<dynamic>?;
+
+      if (ambientSounds != null && ambientSounds.isNotEmpty) {
+        _currentAmbientIndex =
+            (_currentAmbientIndex + 1) % ambientSounds.length;
+        await _playAmbientSound(ambientSounds[_currentAmbientIndex]);
+        await _audioManagerService.speakIfActive(
+          'downloads',
+          "Switched to ${ambientSounds[_currentAmbientIndex]['name']}.",
+        );
+      }
+    }
+  }
+
+  Future<void> _previousAmbientSound() async {
+    if (_currentTourIndex >= 0 && _currentTourIndex < _downloads.length) {
+      final tour = _downloads[_currentTourIndex];
+      final ambientSounds = tour['ambientSounds'] as List<dynamic>?;
+
+      if (ambientSounds != null && ambientSounds.isNotEmpty) {
+        _currentAmbientIndex =
+            (_currentAmbientIndex - 1 + ambientSounds.length) %
+            ambientSounds.length;
+        await _playAmbientSound(ambientSounds[_currentAmbientIndex]);
+        await _audioManagerService.speakIfActive(
+          'downloads',
+          "Switched to ${ambientSounds[_currentAmbientIndex]['name']}.",
+        );
+      }
+    }
+  }
+
+  Future<void> _stopAmbientSound() async {
+    try {
+      await _ambientPlayer.stop();
+      _isAmbientPlaying = false;
+      _playbackTimer?.cancel();
+
+      await _audioManagerService.speakIfActive(
+        'downloads',
+        "Ambient sounds stopped.",
+      );
+    } catch (e) {
+      debugPrint('Error stopping ambient sound: $e');
+    }
+  }
+
+  Future<void> _adjustAmbientVolume(String command) async {
+    if (command.contains('up') || command.contains('increase')) {
+      _ambientVolume = (_ambientVolume + 0.1).clamp(0.0, 1.0);
+      await _ambientPlayer.setVolume(_ambientVolume);
+      await _audioManagerService.speakIfActive(
+        'downloads',
+        "Ambient volume increased to ${(_ambientVolume * 100).round()}%.",
+      );
+    } else if (command.contains('down') || command.contains('decrease')) {
+      _ambientVolume = (_ambientVolume - 0.1).clamp(0.0, 1.0);
+      await _ambientPlayer.setVolume(_ambientVolume);
+      await _audioManagerService.speakIfActive(
+        'downloads',
+        "Ambient volume decreased to ${(_ambientVolume * 100).round()}%.",
+      );
+    } else if (command.contains('mute')) {
+      _ambientVolume = 0.0;
+      await _ambientPlayer.setVolume(_ambientVolume);
+      await _audioManagerService.speakIfActive(
+        'downloads',
+        "Ambient sounds muted.",
+      );
+    } else if (command.contains('full') || command.contains('maximum')) {
+      _ambientVolume = 1.0;
+      await _ambientPlayer.setVolume(_ambientVolume);
+      await _audioManagerService.speakIfActive(
+        'downloads',
+        "Ambient volume set to maximum.",
+      );
+    }
+  }
+
+  Future<void> _toggleAmbientLoop() async {
+    _isAmbientLoop = !_isAmbientLoop;
+    await _audioManagerService.speakIfActive(
+      'downloads',
+      _isAmbientLoop
+          ? "Ambient sounds will loop continuously."
+          : "Ambient sounds will play once.",
+    );
+  }
+
+  Future<void> _listAmbientSounds() async {
+    if (_currentTourIndex >= 0 && _currentTourIndex < _downloads.length) {
+      final tour = _downloads[_currentTourIndex];
+      final ambientSounds = tour['ambientSounds'] as List<dynamic>?;
+
+      if (ambientSounds != null && ambientSounds.isNotEmpty) {
+        String ambientList = "Available ambient sounds for ${tour['name']}: ";
+        for (int i = 0; i < ambientSounds.length; i++) {
+          final sound = ambientSounds[i];
+          ambientList +=
+              "${i + 1}. ${sound['name']}, ${sound['description']}, ${sound['duration']}. ";
+        }
+        ambientList +=
+            "Say 'ambient' to start, 'next ambient' to change, or 'stop ambient' to stop.";
+
+        await _audioManagerService.speakIfActive('downloads', ambientList);
+      } else {
+        await _audioManagerService.speakIfActive(
+          'downloads',
+          "No ambient sounds available for this tour.",
+        );
+      }
+    } else {
+      await _audioManagerService.speakIfActive(
+        'downloads',
+        "Please select a tour first with 'one' through 'four' to see ambient sounds.",
+      );
+    }
+  }
+
+  // Enhanced navigation methods for blind users
+  Future<void> _nextTour() async {
+    if (_downloads.isNotEmpty) {
+      _currentTourIndex = (_currentTourIndex + 1) % _downloads.length;
+      final tour = _downloads[_currentTourIndex];
+
+      String navigationMessage = "Moved to next tour: ${tour['name']}. ";
+      navigationMessage += "${tour['description']} ";
+
+      if (tour['status'] == 'Downloaded') {
+        navigationMessage += "This tour is ready to play. ";
+        navigationMessage +=
+            "Say 'play' to start immediately, 'select' to confirm selection, or 'next' to continue browsing.";
+      } else {
+        navigationMessage += "This tour is ${tour['status']}. ";
+        navigationMessage +=
+            "Say 'download all' to get all tours, or 'next' to see more options.";
+      }
+
+      await _audioManagerService.speakIfActive('downloads', navigationMessage);
+    } else {
+      await _audioManagerService.speakIfActive(
+        'downloads',
+        "No tours available. Say 'download all' to get tours, or 'go back' to return.",
       );
     }
   }
 
   Future<void> _previousTour() async {
-    _currentTourIndex =
-        (_currentTourIndex - 1 + _downloads.length) % _downloads.length;
-    final tour = _downloads[_currentTourIndex];
+    if (_downloads.isNotEmpty) {
+      _currentTourIndex =
+          (_currentTourIndex - 1 + _downloads.length) % _downloads.length;
+      final tour = _downloads[_currentTourIndex];
 
-    if (tour['status'] == 'Downloaded') {
-      await _audioManagerService.speakIfActive(
-        'downloads',
-        "Previous tour: ${tour['name']}. ${tour['description']}. Say 'play' to start, 'next' for next tour, 'previous' for previous tour, or 'repeat' to hear options.",
-      );
+      String navigationMessage = "Moved to previous tour: ${tour['name']}. ";
+      navigationMessage += "${tour['description']} ";
+
+      if (tour['status'] == 'Downloaded') {
+        navigationMessage += "This tour is ready to play. ";
+        navigationMessage +=
+            "Say 'play' to start immediately, 'select' to confirm selection, or 'previous' to continue browsing.";
+      } else {
+        navigationMessage += "This tour is ${tour['status']}. ";
+        navigationMessage +=
+            "Say 'download all' to get all tours, or 'previous' to see more options.";
+      }
+
+      await _audioManagerService.speakIfActive('downloads', navigationMessage);
     } else {
       await _audioManagerService.speakIfActive(
         'downloads',
-        "Previous tour: ${tour['name']} is ${tour['status']}. Say 'play' to start if available, 'next' for next tour, 'previous' for previous tour, or 'repeat' to hear options.",
+        "No tours available. Say 'download all' to get tours, or 'go back' to return.",
       );
     }
   }
@@ -592,7 +1205,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       _currentlyPlaying = tour['name'];
       _pausedTour = '';
       _playbackProgress = 0.0;
-      _currentPlaybackStatus = 'playing';
     });
 
     await _audioManagerService.speakIfActive(
@@ -610,7 +1222,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
           _isPlaying = false;
           _currentlyPlaying = null;
           _playbackProgress = 0.0;
-          _currentPlaybackStatus = 'stopped';
         });
         _audioManagerService.speakIfActive(
           'downloads',
@@ -629,7 +1240,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       _currentlyPlaying = null;
       _pausedTour = '';
       _playbackProgress = 0.0;
-      _currentPlaybackStatus = 'stopped';
     });
     await _audioManagerService.speakIfActive('downloads', "Playback stopped.");
   }
@@ -641,7 +1251,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       _isPlaying = false;
       _isPaused = true;
       _pausedTour = _currentlyPlaying ?? '';
-      _currentPlaybackStatus = 'paused';
     });
   }
 
@@ -652,7 +1261,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         _isPaused = false;
         _currentlyPlaying = _pausedTour;
         _pausedTour = '';
-        _currentPlaybackStatus = 'playing';
       });
 
       await _audioManagerService.speakIfActive(
@@ -774,6 +1382,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
 
   @override
   void dispose() {
+    _ambientPlayer.dispose();
+    _tourPlayer.dispose();
     _playbackTimer?.cancel();
     _progressTimer?.cancel();
     tts.stop();
@@ -781,7 +1391,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     _audioControlSubscription?.cancel();
     _screenActivationSubscription?.cancel();
     _transitionSubscription?.cancel();
-    _voiceStatusSubscription?.cancel();
+
     _navigationCommandSubscription?.cancel();
     _downloadsCommandSubscription?.cancel();
     _audioManagerService.unregisterScreen('downloads');
@@ -1106,7 +1716,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
             ),
           ),
 
-          // Voice control tips
+          // Enhanced voice control tips for blind users
           Container(
             padding: EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -1125,8 +1735,14 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  "Say 'one' through 'four' to select and play specific tours • 'play' to start current tour • 'pause' to pause • 'next' for next tour • 'previous' for previous tour • 'repeat' to hear options • 'go back' to return",
+                  "Say 'select one' through 'select four' to choose tours • 'play' to start • 'pause' to pause • 'next' or 'previous' to navigate • 'ambient' for background sounds • 'status' to check progress • 'help' for all commands",
                   style: TextStyle(color: Colors.white70, fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 4),
+                Text(
+                  "Natural commands: 'select murchison', 'play current tour', 'what's playing', 'volume up', 'speed down'",
+                  style: TextStyle(color: Colors.blue[300], fontSize: 11),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -1135,5 +1751,17 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _playAmbientSoundFile(String fileName) async {
+    try {
+      // Play the actual ambient sound file from assets
+      await _ambientPlayer.play(AssetSource('ambient/$fileName'));
+      await _ambientPlayer.setVolume(_ambientVolume);
+      debugPrint('Playing ambient sound file: $fileName');
+    } catch (e) {
+      debugPrint('Error playing ambient sound file: $e');
+      rethrow;
+    }
   }
 }

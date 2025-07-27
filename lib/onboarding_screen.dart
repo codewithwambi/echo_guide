@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
-import 'login_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -23,26 +22,8 @@ class OnboardingScreenState extends State<OnboardingScreen> {
     Future.microtask(() async {
       await _initTts();
       await _speakTutorial();
-    });
-
-    // Fallback auto navigation after 8 seconds
-    Future.delayed(const Duration(seconds: 8), () {
-      if (!_navigated && mounted) {
-        _goToLogin();
-      }
-    });
-  }
-
-  void _goToLogin() {
-    if (_navigated) return;
-    _navigated = true;
-    tts.speak("Navigating to login screen. Please wait.");
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-      );
+      // Automatically navigate to home after tutorial for blind users
+      await _autoNavigateToHome();
     });
   }
 
@@ -54,10 +35,23 @@ class OnboardingScreenState extends State<OnboardingScreen> {
 
   Future<void> _speakTutorial() async {
     await tts.speak(
-      "Tap anywhere to continue. "
+      "Welcome to EchoPath. "
       "This app helps you discover nearby places through voice. "
-      "Use commands like, what's near me, or download tours for offline use.",
+      "Use commands like 'go to map' for location tracking, 'go to discover' for tours, "
+      "'go to downloads' for offline content, or 'go to help' for assistance. "
+      "Navigating to home screen in 3 seconds.",
     );
+  }
+
+  Future<void> _autoNavigateToHome() async {
+    // Wait for tutorial to complete, then auto-navigate
+    await Future.delayed(const Duration(seconds: 3));
+    if (!_navigated && mounted) {
+      setState(() {
+        _navigated = true;
+      });
+      Navigator.pushReplacementNamed(context, '/home');
+    }
   }
 
   @override
@@ -68,38 +62,30 @@ class OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: _goToLogin,
-      child: Scaffold(
-        backgroundColor: const Color.fromARGB(255, 180, 87, 87),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text(
-                "Welcome to EchoPath 👋",
-                style: TextStyle(color: Colors.white, fontSize: 24),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                "Your accessible tour guide. Tap anywhere or press Continue to proceed.",
-                style: TextStyle(color: Colors.white70, fontSize: 16),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _goToLogin,
-                child: const Text("Continue"),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
-                icon: Icon(Icons.volume_up),
-                label: Text("Replay onboarding instructions"),
-                onPressed: _speakTutorial,
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-              ),
-            ],
-          ),
+    return Scaffold(
+      backgroundColor: const Color.fromARGB(255, 180, 87, 87),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              "Welcome to EchoPath 👋",
+              style: TextStyle(color: Colors.white, fontSize: 24),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              "Your accessible tour guide. Navigating to home screen automatically.",
+              style: TextStyle(color: Colors.white70, fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              icon: Icon(Icons.volume_up),
+              label: Text("Replay onboarding instructions"),
+              onPressed: _speakTutorial,
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+            ),
+          ],
         ),
       ),
     );
