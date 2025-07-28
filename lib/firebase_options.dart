@@ -36,7 +36,10 @@ class DefaultFirebaseOptions {
           'you can reconfigure this by running the FlutterFire CLI again.',
         );
       case TargetPlatform.windows:
-        return windows;
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for windows - '
+          'you can reconfigure this by running the FlutterFire CLI again.',
+        );
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -50,19 +53,11 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyD1jKXANGdcHeHIfeDUsVx79hcKMI1aBB4',
-    appId: '1:926115241361:android:1cbb823ff2529ad5530e30',
-    messagingSenderId: '926115241361',
-    projectId: 'echo-guide-6a131',
-    storageBucket: 'echo-guide-6a131.firebasestorage.app',
+    apiKey: 'AIzaSyCIeexhnwPLdCA9683lD4bfGiE6qmKT-2E',
+    appId: '1:989018014187:android:fad13e9e69d40671e999ae',
+    messagingSenderId: '989018014187',
+    projectId: 'zalonidentalhub',
+    storageBucket: 'zalonidentalhub.appspot.com',
   );
 
-  static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyBNJN7e8fwT5-OzFHlwvyrlW960jEd01cs',
-    appId: '1:926115241361:web:c94a6705edd0bbca530e30',
-    messagingSenderId: '926115241361',
-    projectId: 'echo-guide-6a131',
-    authDomain: 'echo-guide-6a131.firebaseapp.com',
-    storageBucket: 'echo-guide-6a131.firebasestorage.app',
-  );
 }
