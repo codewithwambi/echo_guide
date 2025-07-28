@@ -21,12 +21,10 @@ class _SplashScreenState extends State<SplashScreen> {
     _speakIntro();
 
     Future.delayed(const Duration(seconds: 4), () {
-      if (mounted) { // Essential check before navigation
+      if (mounted) {
+        // Essential check before navigation
         Navigator.pushReplacement(
           context,
-          // --- FIX for 'const_with_non_const' ---
-          // Removed 'const' because OnboardingScreen's constructor isn't const.
-          // If OnboardingScreen can be const, add 'const' to its constructor.
           MaterialPageRoute(builder: (context) => OnboardingScreen()),
         );
       }
@@ -35,15 +33,14 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _initTts() async {
     await tts.setLanguage("en-US");
-    // You can add more settings here, e.g.:
-    // await tts.setPitch(1.0);
-    // await tts.setSpeechRate(0.5);
+    await tts.setPitch(1.0);
+    await tts.setSpeechRate(0.5);
   }
 
   Future<void> _speakIntro() async {
-    // --- FIX for 'unnecessary_null_comparison' ---
-    // Removed 'if (tts != null)' because 'tts' is 'late' and guaranteed to be initialized.
-    await tts.speak("Welcome to EchoPath. Your journey begins here.");
+    await tts.speak(
+      "Welcome to EchoPath. Your accessible journey begins here. Please wait while we get things ready.",
+    );
   }
 
   @override
@@ -54,16 +51,33 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold( // This can remain const if its children are const
+    return Scaffold(
       backgroundColor: Colors.black,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.mic, color: Colors.blueAccent, size: 100),
-            SizedBox(height: 20),
-            Text("EchoPath", style: TextStyle(color: Colors.white, fontSize: 28)),
-            Text("Voice powered tour guide", style: TextStyle(color: Colors.grey)),
+            const Icon(Icons.mic, color: Colors.blueAccent, size: 100),
+            const SizedBox(height: 20),
+            const Text(
+              "EchoPath",
+              style: TextStyle(color: Colors.white, fontSize: 28),
+            ),
+            const Text(
+              "Voice powered tour guide",
+              style: TextStyle(color: Colors.grey),
+            ),
+            const SizedBox(height: 30),
+            const CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.blueAccent),
+            ),
+            const SizedBox(height: 30),
+            ElevatedButton.icon(
+              icon: Icon(Icons.volume_up),
+              label: Text("Replay welcome"),
+              onPressed: _speakIntro,
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+            ),
           ],
         ),
       ),
