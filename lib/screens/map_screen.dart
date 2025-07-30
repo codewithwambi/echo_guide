@@ -1640,7 +1640,7 @@ class MapScreen extends StatefulWidget {
   State<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> {
+class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   GoogleMapController? _mapController;
   final LocationService _locationService = LocationService();
   final VoiceCommandService _voiceCommandService = VoiceCommandService();
@@ -1678,10 +1678,11 @@ class _MapScreenState extends State<MapScreen> {
   Timer? _markerUpdateTimer;
   Timer? _firestoreUpdateTimer;
   Timer? _otherUsersUpdateTimer;
+  Timer? _locationNarrationTimer;
   Position? _pendingPositionUpdate;
 
   // Enhanced voice features
-  final bool _isVoiceEnabled = true;
+  // Remove the hardcoded voice enabled flag and use the dynamic one
 
   // Map screen specific voice command state
   bool _isMapVoiceEnabled = true;
@@ -1700,12 +1701,42 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
+    debugPrint('🗺️ Map screen initializing...');
+    WidgetsBinding.instance.addObserver(this);
     _initializeServices();
     _listenToOtherUsers();
     _initializeVoiceNavigation();
     _registerWithAudioManager();
     _setupVoiceNavigation();
     _initializeScreen();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Ensure map screen is activated when dependencies change
+    if (_isMapVoiceEnabled) {
+      _audioManagerService.activateScreenAudio('map');
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    switch (state) {
+      case AppLifecycleState.resumed:
+        debugPrint('🗺️ Map screen resumed - activating audio');
+        if (_isMapVoiceEnabled) {
+          _audioManagerService.activateScreenAudio('map');
+        }
+        break;
+      case AppLifecycleState.paused:
+        debugPrint('🗺️ Map screen paused - deactivating audio');
+        _audioManagerService.deactivateScreenAudio('map');
+        break;
+      default:
+        break;
+    }
   }
 
   void _setupVoiceNavigation() {
@@ -1723,17 +1754,25 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _initializeScreen() async {
     try {
-      await _ttsService.speakWithPriority(
+      debugPrint('🗺️ Initializing map screen with audio manager...');
+
+      // Ensure map screen is activated in audio manager
+      await _audioManagerService.activateScreenAudio('map');
+
+      // Use audio manager for welcome message
+      await _audioManagerService.speakIfActive(
+        'map',
         'Welcome to your interactive map guide! I\'m here to help you explore your surroundings with comprehensive voice navigation. '
-        'I can tell you about nearby hotels, restaurants, attractions, facilities, transportation, and much more. '
-        'Say "surroundings" to hear about your current area, "landmarks" for attractions, "hotels" for accommodation, "restaurants" for dining, "facilities" for services, "transport" for transportation, "safety" for emergency services, or "help" for all options. '
-        'I\'ll provide real-time information and guide you through your exploration. What would you like to discover first?',
+            'I can tell you about nearby hotels, restaurants, attractions, facilities, transportation, and much more. '
+            'Say "surroundings" to hear about your current area, "landmarks" for attractions, "hotels" for accommodation, "restaurants" for dining, "facilities" for services, "transport" for transportation, "safety" for emergency services, or "help" for all options. '
+            'I\'ll provide real-time information and guide you through your exploration. What would you like to discover first?',
       );
 
       // Load initial nearby places
       await _loadNearbyPlaces();
     } catch (e) {
       debugPrint('Error initializing map screen: $e');
+      // Fallback to direct TTS
       await _ttsService.speakWithPriority(
         'I encountered an issue initializing the map. Please try again, or say "help" for assistance.',
       );
@@ -1763,7 +1802,8 @@ class _MapScreenState extends State<MapScreen> {
         setState(() {
           _isLoadingPlaces = false;
         });
-        await _ttsService.speakWithPriority(
+        await _audioManagerService.speakIfActive(
+          'map',
           'Location not available. Please enable location services to find nearby places.',
         );
       }
@@ -1772,7 +1812,8 @@ class _MapScreenState extends State<MapScreen> {
       setState(() {
         _isLoadingPlaces = false;
       });
-      await _ttsService.speakWithPriority(
+      await _audioManagerService.speakIfActive(
+        'map',
         'Error loading nearby places. Please try again.',
       );
     }
@@ -1896,7 +1937,7 @@ class _MapScreenState extends State<MapScreen> {
       _showCategorySelector = false;
     });
 
-    if (_isVoiceEnabled) {
+    if (_isMapVoiceEnabled) {
       String categoryName = _getCategoryDisplayName(category);
       await _audioManagerService.speakIfActive(
         'map',
@@ -1925,14 +1966,14 @@ class _MapScreenState extends State<MapScreen> {
     });
 
     if (_showCategorySelector) {
-      if (_isVoiceEnabled) {
+      if (_isMapVoiceEnabled) {
         await _audioManagerService.speakIfActive(
           'map',
           'Category selector opened. Choose a place type to search for nearby locations.',
         );
       }
     } else {
-      if (_isVoiceEnabled) {
+      if (_isMapVoiceEnabled) {
         await _audioManagerService.speakIfActive(
           'map',
           'Category selector closed.',
@@ -1959,14 +2000,14 @@ class _MapScreenState extends State<MapScreen> {
     });
 
     if (_showNearbyPlaces) {
-      if (_isVoiceEnabled) {
+      if (_isMapVoiceEnabled) {
         await _audioManagerService.speakIfActive(
           'map',
           'Nearby places panel opened. Browse discovered locations and tap on any place for details.',
         );
       }
     } else {
-      if (_isVoiceEnabled) {
+      if (_isMapVoiceEnabled) {
         await _audioManagerService.speakIfActive(
           'map',
           'Nearby places panel closed.',
@@ -1990,16 +2031,23 @@ class _MapScreenState extends State<MapScreen> {
       debugPrint('Vibration error: $e');
     }
 
-    // Enhanced speech narration for place selection
-    if (_isVoiceEnabled) {
+    // Enhanced speech narration for place selection with current location context
+    if (_isMapVoiceEnabled) {
       String placeDescription = "Place selected: ${place.name}. ";
 
       // Add category information
       String categoryDesc = _getCategoryDisplayName(place.category);
       placeDescription += "This is a $categoryDesc. ";
 
-      // Add distance information if position is available
+      // Add current location context
       if (_currentPosition != null) {
+        placeDescription += "Your current location: ";
+        placeDescription +=
+            "${_currentPosition!.latitude.toStringAsFixed(4)}, ";
+        placeDescription +=
+            "${_currentPosition!.longitude.toStringAsFixed(4)}. ";
+
+        // Add distance and direction information
         double distance = _calculateDistance(
           _currentPosition!.latitude,
           _currentPosition!.longitude,
@@ -2007,8 +2055,27 @@ class _MapScreenState extends State<MapScreen> {
           place.longitude,
         );
         String distanceDesc = _getDistanceDescription(distance);
+        String direction = _getDirectionToDestination(
+          _currentPosition!.latitude,
+          _currentPosition!.longitude,
+          place.latitude,
+          place.longitude,
+        );
+
         placeDescription +=
-            "It's located $distanceDesc from your current location. ";
+            "The place is $distanceDesc away, located to the $direction. ";
+
+        // Add estimated walking time
+        int walkingTimeMinutes =
+            (distance / 80)
+                .round(); // Assuming 80 meters per minute walking speed
+        if (walkingTimeMinutes > 0) {
+          placeDescription +=
+              "Estimated walking time: $walkingTimeMinutes minutes. ";
+        }
+      } else {
+        placeDescription +=
+            "Location services not available. Please enable location to get distance information. ";
       }
 
       // Add address information
@@ -2021,11 +2088,23 @@ class _MapScreenState extends State<MapScreen> {
         placeDescription += "Rating: ${place.rating} out of 5 stars. ";
       }
 
+      // Add accessibility information based on category
+      String accessibilityInfo = _getAccessibilityInfo(place.category);
+      placeDescription += accessibilityInfo;
+
       // Add action suggestions
       placeDescription +=
-          "Say 'navigate to ${place.name}' for turn-by-turn directions, 'call ${place.name}' for contact information, or 'tell me more' for additional details.";
+          "Say 'navigate to ${place.name}' for turn-by-turn directions, 'call ${place.name}' for contact information, 'tell me more' for additional details, or 'describe surroundings' to hear about nearby places.";
 
-      await _audioManagerService.speakIfActive('map', placeDescription);
+      debugPrint('🎤 Attempting to speak place description: ${place.name}');
+      try {
+        await _audioManagerService.speakIfActive('map', placeDescription);
+        debugPrint('🎤 Place description spoken successfully');
+      } catch (e) {
+        debugPrint('🎤 Audio manager failed, using fallback TTS: $e');
+        // Fallback to direct TTS
+        await _ttsService.speakWithPriority(placeDescription);
+      }
     }
   }
 
@@ -2040,14 +2119,18 @@ class _MapScreenState extends State<MapScreen> {
       debugPrint('Vibration error: $e');
     }
 
-    // Speech narration for map tap
-    if (_isVoiceEnabled) {
+    // Enhanced speech narration for map tap with current location context
+    if (_isMapVoiceEnabled) {
       String tapDescription = "Map tapped at coordinates ";
       tapDescription += "${position.latitude.toStringAsFixed(4)}, ";
       tapDescription += "${position.longitude.toStringAsFixed(4)}. ";
 
-      // Add distance from current location if available
+      // Add current location context and distance information
       if (_currentPosition != null) {
+        tapDescription += "Your current location: ";
+        tapDescription += "${_currentPosition!.latitude.toStringAsFixed(4)}, ";
+        tapDescription += "${_currentPosition!.longitude.toStringAsFixed(4)}. ";
+
         double distance = _calculateDistance(
           _currentPosition!.latitude,
           _currentPosition!.longitude,
@@ -2055,12 +2138,31 @@ class _MapScreenState extends State<MapScreen> {
           position.longitude,
         );
         String distanceDesc = _getDistanceDescription(distance);
+        String direction = _getDirectionToDestination(
+          _currentPosition!.latitude,
+          _currentPosition!.longitude,
+          position.latitude,
+          position.longitude,
+        );
+
         tapDescription +=
-            "This location is $distanceDesc from your current position. ";
+            "The tapped location is $distanceDesc away, located to the $direction. ";
+
+        // Add estimated walking time
+        int walkingTimeMinutes =
+            (distance / 80)
+                .round(); // Assuming 80 meters per minute walking speed
+        if (walkingTimeMinutes > 0) {
+          tapDescription +=
+              "Estimated walking time: $walkingTimeMinutes minutes. ";
+        }
+      } else {
+        tapDescription +=
+            "Location services not available. Please enable location to get distance information. ";
       }
 
       tapDescription +=
-          "Say 'what's here' to discover nearby places, or 'navigate here' for directions to this location.";
+          "Say 'what's here' to discover nearby places, 'navigate here' for directions to this location, or 'describe surroundings' to hear about the area.";
 
       await _audioManagerService.speakIfActive('map', tapDescription);
     }
@@ -2078,7 +2180,7 @@ class _MapScreenState extends State<MapScreen> {
 
     _mapController?.animateCamera(CameraUpdate.zoomIn());
 
-    if (_isVoiceEnabled) {
+    if (_isMapVoiceEnabled) {
       await _audioManagerService.speakIfActive(
         'map',
         'Zooming in on map for closer view',
@@ -2098,7 +2200,7 @@ class _MapScreenState extends State<MapScreen> {
 
     _mapController?.animateCamera(CameraUpdate.zoomOut());
 
-    if (_isVoiceEnabled) {
+    if (_isMapVoiceEnabled) {
       await _audioManagerService.speakIfActive(
         'map',
         'Zooming out on map for wider view',
@@ -2107,7 +2209,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _goToCurrentLocation() async {
-    // Haptic feedback for current location
+    // Enhanced haptic feedback for current location
     try {
       if (await Vibration.hasVibrator()) {
         Vibration.vibrate(duration: 40);
@@ -2123,17 +2225,21 @@ class _MapScreenState extends State<MapScreen> {
         ),
       );
 
-      if (_isVoiceEnabled) {
-        await _audioManagerService.speakIfActive(
-          'map',
-          'Centering map on your current location',
-        );
+      if (_isMapVoiceEnabled) {
+        String locationInfo = "Centering map on your current location. ";
+        locationInfo += "You are at coordinates ";
+        locationInfo += "${_currentPosition!.latitude.toStringAsFixed(4)}, ";
+        locationInfo += "${_currentPosition!.longitude.toStringAsFixed(4)}. ";
+        locationInfo +=
+            "Say 'describe surroundings' to hear about nearby places, or 'what's here' to discover local attractions.";
+
+        await _audioManagerService.speakIfActive('map', locationInfo);
       }
     } else {
-      if (_isVoiceEnabled) {
+      if (_isMapVoiceEnabled) {
         await _audioManagerService.speakIfActive(
           'map',
-          'Current location not available. Please enable location services.',
+          'Location not available. Please enable location services to get your current position and nearby information.',
         );
       }
     }
@@ -2289,7 +2395,7 @@ class _MapScreenState extends State<MapScreen> {
   Future<void> _registerWithAudioManager() async {
     final speech = stt.SpeechToText();
     await speech.initialize();
-    _audioManagerService.registerScreen('map', _tts, speech);
+    _audioManagerService.registerScreen('map', _ttsService._tts, speech);
 
     _audioManagerService.enableNarration(
       'map',
@@ -2726,19 +2832,32 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _onMapScreenActivated() async {
     if (mounted) {
+      debugPrint('🗺️ Map screen activated - enabling voice features');
       setState(() {
         _isMapVoiceEnabled = true;
       });
+
+      // Ensure audio manager knows map screen is active
+      await _audioManagerService.activateScreenAudio('map');
+
       _audioNarrationService.startNarration();
       _startContinuousNarration();
+
+      // Automatic speech narration when map screen becomes active
+      await _provideAutomaticLocationNarration();
     }
   }
 
   Future<void> _onMapScreenDeactivated() async {
     if (mounted) {
+      debugPrint('🗺️ Map screen deactivated - disabling voice features');
       setState(() {
         _isMapVoiceEnabled = false;
       });
+
+      // Ensure audio manager knows map screen is deactivated
+      await _audioManagerService.deactivateScreenAudio('map');
+
       _audioNarrationService.stopNarration();
       _narrationTimer?.cancel();
     }
@@ -2816,6 +2935,14 @@ class _MapScreenState extends State<MapScreen> {
     _firestoreUpdateTimer = Timer(const Duration(milliseconds: 15000), () {
       _updateUserLocationInFirestore(position);
     });
+
+    // Automatic location narration when user moves significantly (every 30 seconds)
+    _locationNarrationTimer?.cancel();
+    _locationNarrationTimer = Timer(const Duration(seconds: 30), () {
+      if (mounted && _isMapVoiceEnabled && _currentPosition != null) {
+        _provideLocationUpdateNarration();
+      }
+    });
   }
 
   // Calculate distance between two points
@@ -2852,6 +2979,97 @@ class _MapScreenState extends State<MapScreen> {
       return 'a short walk away, about ${(distanceInMeters / 100).toStringAsFixed(1)} blocks';
     } else {
       return 'about ${(distanceInMeters / 1000).toStringAsFixed(1)} kilometers away';
+    }
+  }
+
+  // Get direction to destination for blind users
+  String _getDirectionToDestination(
+    double currentLat,
+    double currentLon,
+    double destLat,
+    double destLon,
+  ) {
+    double latDiff = destLat - currentLat;
+    double lonDiff = destLon - currentLon;
+
+    // Calculate bearing
+    double bearing = math.atan2(lonDiff, latDiff) * 180 / math.pi;
+    bearing = (bearing + 360) % 360;
+
+    // Convert bearing to cardinal directions
+    if (bearing >= 337.5 || bearing < 22.5) {
+      return 'north';
+    } else if (bearing >= 22.5 && bearing < 67.5) {
+      return 'northeast';
+    } else if (bearing >= 67.5 && bearing < 112.5) {
+      return 'east';
+    } else if (bearing >= 112.5 && bearing < 157.5) {
+      return 'southeast';
+    } else if (bearing >= 157.5 && bearing < 202.5) {
+      return 'south';
+    } else if (bearing >= 202.5 && bearing < 247.5) {
+      return 'southwest';
+    } else if (bearing >= 247.5 && bearing < 292.5) {
+      return 'west';
+    } else {
+      return 'northwest';
+    }
+  }
+
+  // Get accessibility information for different place categories
+  String _getAccessibilityInfo(String category) {
+    switch (category.toLowerCase()) {
+      case 'restaurant':
+        return 'This restaurant is accessible with wheelchair ramps and accessible seating. ';
+      case 'hotel':
+        return 'This hotel offers accessible rooms and facilities for guests with disabilities. ';
+      case 'hospital':
+        return 'This hospital is fully accessible with ramps, elevators, and accessible facilities. ';
+      case 'pharmacy':
+        return 'This pharmacy is accessible with wide aisles and assistance available. ';
+      case 'bank':
+        return 'This bank has accessible entrances and ATMs with audio assistance. ';
+      case 'atm':
+        return 'This ATM has audio assistance and is accessible for wheelchair users. ';
+      case 'gas_station':
+        return 'This gas station has accessible pumps and facilities. ';
+      case 'parking':
+        return 'Accessible parking spaces are available at this location. ';
+      case 'bus_station':
+        return 'This bus station has accessible boarding areas and audio announcements. ';
+      case 'taxi_stand':
+        return 'Accessible taxis are available at this location. ';
+      case 'police':
+        return 'This police station is accessible with ramps and assistance available. ';
+      case 'fire_station':
+        return 'This fire station is accessible for emergency services. ';
+      case 'school':
+        return 'This school has accessible facilities and accommodations for students with disabilities. ';
+      case 'university':
+        return 'This university campus is accessible with ramps, elevators, and support services. ';
+      case 'library':
+        return 'This library is accessible with audio books and assistive technology available. ';
+      case 'museum':
+        return 'This museum offers audio tours and accessible exhibits for visitors with disabilities. ';
+      case 'park':
+        return 'This park has accessible pathways and facilities for visitors with disabilities. ';
+      case 'shopping_mall':
+        return 'This shopping mall is accessible with ramps, elevators, and wide aisles. ';
+      case 'market':
+        return 'This market has accessible entrances and assistance available for shoppers. ';
+      case 'post_office':
+        return 'This post office is accessible with ramps and assistance available. ';
+      case 'tourist_attraction':
+        return 'This attraction offers accessible tours and facilities for visitors with disabilities. ';
+      case 'church':
+      case 'mosque':
+      case 'temple':
+        return 'This place of worship is accessible with ramps and assistance available. ';
+      case 'embassy':
+      case 'government_office':
+        return 'This government facility is accessible with ramps and assistance available. ';
+      default:
+        return 'This location is accessible for visitors with disabilities. ';
     }
   }
 
@@ -2894,13 +3112,20 @@ class _MapScreenState extends State<MapScreen> {
       debugPrint('Vibration error: $e');
     }
 
-    // Enhanced speech narration for landmark selection
-    if (_isVoiceEnabled) {
+    // Enhanced speech narration for landmark selection with current location context
+    if (_isMapVoiceEnabled) {
       String landmarkDescription = "Landmark selected: ${landmark.name}. ";
       landmarkDescription += "${landmark.description}. ";
 
-      // Add distance information if position is available
+      // Add current location context first
       if (_currentPosition != null) {
+        landmarkDescription += "Your current location: ";
+        landmarkDescription +=
+            "${_currentPosition!.latitude.toStringAsFixed(4)}, ";
+        landmarkDescription +=
+            "${_currentPosition!.longitude.toStringAsFixed(4)}. ";
+
+        // Add distance and direction information
         double distance = _calculateDistance(
           _currentPosition!.latitude,
           _currentPosition!.longitude,
@@ -2908,14 +3133,45 @@ class _MapScreenState extends State<MapScreen> {
           landmark.longitude,
         );
         String distanceDesc = _getDistanceDescription(distance);
+        String direction = _getDirectionToDestination(
+          _currentPosition!.latitude,
+          _currentPosition!.longitude,
+          landmark.latitude,
+          landmark.longitude,
+        );
+
         landmarkDescription +=
-            "This landmark is $distanceDesc away from your current location. ";
+            "The landmark is $distanceDesc away, located to the $direction. ";
+
+        // Add estimated walking time
+        int walkingTimeMinutes =
+            (distance / 80)
+                .round(); // Assuming 80 meters per minute walking speed
+        if (walkingTimeMinutes > 0) {
+          landmarkDescription +=
+              "Estimated walking time: $walkingTimeMinutes minutes. ";
+        }
+      } else {
+        landmarkDescription +=
+            "Location services not available. Please enable location to get distance information. ";
       }
 
+      // Add accessibility information
+      landmarkDescription += "This landmark is accessible for visitors. ";
       landmarkDescription +=
-          "Say 'navigate to ${landmark.name}' to start turn-by-turn directions, or 'tell me more' for additional information.";
+          "Say 'navigate to ${landmark.name}' to start turn-by-turn directions, 'tell me more' for additional information, or 'describe surroundings' to hear about nearby places.";
 
-      await _audioManagerService.speakIfActive('map', landmarkDescription);
+      debugPrint(
+        '🎤 Attempting to speak landmark description: ${landmark.name}',
+      );
+      try {
+        await _audioManagerService.speakIfActive('map', landmarkDescription);
+        debugPrint('🎤 Landmark description spoken successfully');
+      } catch (e) {
+        debugPrint('🎤 Audio manager failed, using fallback TTS: $e');
+        // Fallback to direct TTS
+        await _ttsService.speakWithPriority(landmarkDescription);
+      }
     }
 
     // Start navigation assistance
@@ -2923,7 +3179,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _startNavigationTo(Landmark landmark) async {
-    if (_isVoiceEnabled) {
+    if (_isMapVoiceEnabled) {
       String navigationStart =
           "Starting navigation to ${landmark.name}. I'll guide you there with turn-by-turn directions.";
       await _audioManagerService.speakIfActive('map', navigationStart);
@@ -2991,6 +3247,162 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  // Automatic speech narration when map screen becomes active
+  Future<void> _provideAutomaticLocationNarration() async {
+    try {
+      // Brief delay to ensure screen is fully loaded
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      if (!mounted || !_isMapVoiceEnabled) return;
+
+      String automaticNarration = "Map screen activated. ";
+
+      if (_currentPosition != null) {
+        // Provide current location information
+        automaticNarration += "Your current location: ";
+        automaticNarration +=
+            "${_currentPosition!.latitude.toStringAsFixed(4)}, ";
+        automaticNarration +=
+            "${_currentPosition!.longitude.toStringAsFixed(4)}. ";
+
+        // Add nearby landmarks information
+        if (_nearbyLandmarks.isNotEmpty) {
+          automaticNarration += "Nearby landmarks: ";
+          List<String> landmarkNames = [];
+          for (int i = 0; i < _nearbyLandmarks.length && i < 3; i++) {
+            Landmark landmark = _nearbyLandmarks[i];
+            double distance = _calculateDistance(
+              _currentPosition!.latitude,
+              _currentPosition!.longitude,
+              landmark.latitude,
+              landmark.longitude,
+            );
+            String distanceDesc = _getDistanceDescription(distance);
+            landmarkNames.add("${landmark.name} ($distanceDesc away)");
+          }
+          automaticNarration += landmarkNames.join(', ');
+          automaticNarration += ". ";
+        }
+
+        // Add nearby places information
+        if (_nearbyPlaces.isNotEmpty) {
+          automaticNarration += "Nearby places: ";
+          Map<String, List<NearbyPlace>> placesByCategory = {};
+          for (NearbyPlace place in _nearbyPlaces) {
+            if (!placesByCategory.containsKey(place.category)) {
+              placesByCategory[place.category] = [];
+            }
+            placesByCategory[place.category]!.add(place);
+          }
+
+          List<String> categoryDescriptions = [];
+          placesByCategory.forEach((category, places) {
+            if (places.isNotEmpty) {
+              String categoryName = _getCategoryDisplayName(category);
+              categoryDescriptions.add("${places.length} $categoryName");
+            }
+          });
+
+          if (categoryDescriptions.isNotEmpty) {
+            automaticNarration += categoryDescriptions.join(', ');
+            automaticNarration += ". ";
+          }
+        }
+
+        // Add action suggestions
+        automaticNarration +=
+            "Say 'describe surroundings' for detailed area information, 'landmarks' for attractions, 'restaurants' for dining options, 'hotels' for accommodation, 'facilities' for services, or 'help' for all available commands. ";
+        automaticNarration +=
+            "Tap on any point on the map to hear detailed information about that location.";
+      } else {
+        // Location not available
+        automaticNarration +=
+            "Location services not available. Please enable location services to get your current position and nearby information. ";
+        automaticNarration +=
+            "Say 'help' for available commands or enable location services to explore your surroundings.";
+      }
+
+      debugPrint('🎤 Attempting to speak automatic location narration');
+      try {
+        await _audioManagerService.speakIfActive('map', automaticNarration);
+        debugPrint('🎤 Automatic location narration spoken successfully');
+      } catch (e) {
+        debugPrint('🎤 Audio manager failed, using fallback TTS: $e');
+        // Fallback to direct TTS
+        await _ttsService.speakWithPriority(automaticNarration);
+      }
+    } catch (e) {
+      debugPrint('Error providing automatic location narration: $e');
+      // Fallback narration
+      await _audioManagerService.speakIfActive(
+        'map',
+        'Map screen ready. Say "help" for available commands or "surroundings" to explore your area.',
+      );
+    }
+  }
+
+  // Automatic location update narration when user moves
+  Future<void> _provideLocationUpdateNarration() async {
+    try {
+      if (!mounted || !_isMapVoiceEnabled || _currentPosition == null) return;
+
+      String locationUpdateNarration = "Location update. ";
+      locationUpdateNarration += "You are now at coordinates ";
+      locationUpdateNarration +=
+          "${_currentPosition!.latitude.toStringAsFixed(4)}, ";
+      locationUpdateNarration +=
+          "${_currentPosition!.longitude.toStringAsFixed(4)}. ";
+
+      // Add nearby landmarks information
+      if (_nearbyLandmarks.isNotEmpty) {
+        locationUpdateNarration += "Nearby landmarks: ";
+        List<String> landmarkNames = [];
+        for (int i = 0; i < _nearbyLandmarks.length && i < 2; i++) {
+          Landmark landmark = _nearbyLandmarks[i];
+          double distance = _calculateDistance(
+            _currentPosition!.latitude,
+            _currentPosition!.longitude,
+            landmark.latitude,
+            landmark.longitude,
+          );
+          String distanceDesc = _getDistanceDescription(distance);
+          landmarkNames.add("${landmark.name} ($distanceDesc away)");
+        }
+        locationUpdateNarration += landmarkNames.join(', ');
+        locationUpdateNarration += ". ";
+      }
+
+      // Add nearby places summary
+      if (_nearbyPlaces.isNotEmpty) {
+        Map<String, int> categoryCounts = {};
+        for (NearbyPlace place in _nearbyPlaces) {
+          categoryCounts[place.category] =
+              (categoryCounts[place.category] ?? 0) + 1;
+        }
+
+        List<String> categorySummaries = [];
+        categoryCounts.forEach((category, count) {
+          if (count > 0) {
+            String categoryName = _getCategoryDisplayName(category);
+            categorySummaries.add("$count $categoryName");
+          }
+        });
+
+        if (categorySummaries.isNotEmpty) {
+          locationUpdateNarration +=
+              "Nearby: ${categorySummaries.join(', ')}. ";
+        }
+      }
+
+      locationUpdateNarration +=
+          "Say 'describe surroundings' for detailed information or tap on the map to explore specific locations.";
+
+      await _audioManagerService.speakIfActive('map', locationUpdateNarration);
+    } catch (e) {
+      debugPrint('Error providing location update narration: $e');
+    }
+  }
+
   Future<void> _narrateRecentPlaces() async {
     List<String> recentPlaces =
         _mapNarrationService.getRecentlyNarratedPlaces();
@@ -3049,6 +3461,7 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _locationService.stopTracking();
     _voiceCommandService.stopListening();
     _voiceNavigationService.stopContinuousListening();
@@ -3061,6 +3474,7 @@ class _MapScreenState extends State<MapScreen> {
     _audioUpdateTimer?.cancel();
     _mapUpdateTimer?.cancel();
     _markerUpdateTimer?.cancel();
+    _locationNarrationTimer?.cancel();
     _firestoreUpdateTimer?.cancel();
     _otherUsersUpdateTimer?.cancel();
 

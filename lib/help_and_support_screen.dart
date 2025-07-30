@@ -236,10 +236,49 @@ class _HelpAndSupportScreenState extends State<HelpAndSupportScreen> {
   Future<void> _speakTopicDetails(int index) async {
     if (index >= 0 && index < _helpTopics.length) {
       final topic = _helpTopics[index];
-      String message =
-          "${topic['title']}: ${topic['description']}. ${topic['commands']}. ";
+
+      // Enhanced speech narration with comprehensive information
+      String message = "Help topic selected: ${topic['title']}. ";
+      message += "${topic['description']}. ";
+      message += "Available commands: ${topic['commands']}. ";
+
+      // Add topic-specific guidance
+      switch (index) {
+        case 0: // Quick Navigation
+          message +=
+              "This section helps you move between different parts of the app using voice commands. ";
+          message +=
+              "You can navigate to any screen from anywhere in the app. ";
+          break;
+        case 1: // Map Exploration
+          message +=
+              "The map screen provides location-based exploration with detailed descriptions. ";
+          message +=
+              "Perfect for discovering nearby places and getting directions. ";
+          break;
+        case 2: // Tour Discovery
+          message +=
+              "Find and experience guided tours with immersive audio narration. ";
+          message +=
+              "Each tour includes historical context and accessibility information. ";
+          break;
+        case 3: // My Content
+          message +=
+              "Manage your downloaded tours and offline content library. ";
+          message += "Access your content without internet connection. ";
+          break;
+        case 4: // Voice Control
+          message += "Master voice commands for seamless app interaction. ";
+          message += "Control all features through natural speech. ";
+          break;
+        case 5: // Quick Help
+          message += "Get immediate assistance and comprehensive support. ";
+          message += "Includes tutorials and troubleshooting guides. ";
+          break;
+      }
+
       message +=
-          "Say 'pause' to stop, 'play' to continue, 'next' for next topic, 'previous' for previous topic, 'repeat' to hear again, 'menu' to see all topics, or 'go back' to return.";
+          "Say 'detailed help' for comprehensive information, 'pause' to stop, 'play' to continue, 'next' for next topic, 'previous' for previous topic, 'repeat' to hear again, 'menu' to see all topics, or 'go back' to return.";
 
       await _audioManagerService.speakIfActive('help', message);
     } else {
@@ -254,8 +293,9 @@ class _HelpAndSupportScreenState extends State<HelpAndSupportScreen> {
   Future<void> _speakDetailedTopicHelp(int index) async {
     if (index >= 0 && index < _helpTopics.length) {
       final topic = _helpTopics[index];
-      String detailedMessage = "${topic['title']}: ${topic['description']}. ";
-      detailedMessage += "${topic['commands']}. ";
+      String detailedMessage = "Comprehensive help for: ${topic['title']}. ";
+      detailedMessage += "${topic['description']}. ";
+      detailedMessage += "Available commands: ${topic['commands']}. ";
       detailedMessage += "${topic['detailed_help']} ";
       detailedMessage +=
           "Say 'pause' to stop, 'play' to continue, 'next' for next topic, 'previous' for previous topic, 'repeat' to hear again, 'menu' to see all topics, or 'go back' to return.";
@@ -266,6 +306,20 @@ class _HelpAndSupportScreenState extends State<HelpAndSupportScreen> {
         'help',
         "Topic not available. Say 'menu' to see all available topics, or 'one' through 'six' to select a specific topic.",
       );
+    }
+  }
+
+  // Enhanced card content narration for immediate feedback
+  Future<void> _speakCardContent(int index) async {
+    if (index >= 0 && index < _helpTopics.length) {
+      final topic = _helpTopics[index];
+      String cardContent = "Card ${index + 1}: ${topic['title']}. ";
+      cardContent += "${topic['description']}. ";
+      cardContent += "Commands: ${topic['commands']}. ";
+      cardContent +=
+          "Tap again for detailed information or say 'detailed help' for comprehensive guidance.";
+
+      await _audioManagerService.speakIfActive('help', cardContent);
     }
   }
 
@@ -762,17 +816,35 @@ class _HelpAndSupportScreenState extends State<HelpAndSupportScreen> {
                       ],
                     ),
                     onTap: () async {
-                      // Haptic feedback and vibration
+                      // Enhanced haptic feedback and vibration
                       try {
                         if (await Vibration.hasVibrator()) {
+                          // Double vibration pattern for help topic selection
+                          Vibration.vibrate(duration: 80);
+                          await Future.delayed(
+                            const Duration(milliseconds: 100),
+                          );
                           Vibration.vibrate(duration: 60);
                         }
                       } catch (e) {
                         // Ignore vibration errors
                       }
+
                       // Stop any ongoing TTS
                       await tts.stop();
-                      // Speak topic details
+
+                      // Update current topic index
+                      setState(() {
+                        _currentTopicIndex = index;
+                      });
+
+                      // Provide immediate feedback with card content
+                      await _speakCardContent(index);
+
+                      // Brief pause for user to process
+                      await Future.delayed(const Duration(milliseconds: 800));
+
+                      // Speak comprehensive topic details
                       await _speakTopicDetails(index);
                     },
                     trailing: Icon(Icons.help_outline, color: Colors.blue),
@@ -801,13 +873,13 @@ class _HelpAndSupportScreenState extends State<HelpAndSupportScreen> {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  "Say 'select one' through 'select six' for topics • 'detailed help' for comprehensive information • 'pause' to stop • 'play' to continue • 'next' for next topic • 'previous' for previous topic • 'menu' to see all topics • 'status' to check current topic",
+                  "Tap cards for enhanced narration • Say 'select one' through 'select six' for topics • 'detailed help' for comprehensive information • 'pause' to stop • 'play' to continue • 'next' for next topic • 'previous' for previous topic • 'menu' to see all topics • 'status' to check current topic",
                   style: TextStyle(color: Colors.white70, fontSize: 12),
                   textAlign: TextAlign.center,
                 ),
                 SizedBox(height: 4),
                 Text(
-                  "Natural commands: 'select navigation', 'select map', 'select tour', 'what's current', 'help' for all commands",
+                  "Natural commands: 'select navigation', 'select map', 'select tour', 'what's current', 'help' for all commands • Enhanced haptic feedback on tap",
                   style: TextStyle(color: Colors.blue[300], fontSize: 11),
                   textAlign: TextAlign.center,
                 ),
