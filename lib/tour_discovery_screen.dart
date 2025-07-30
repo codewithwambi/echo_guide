@@ -453,11 +453,28 @@ class _TourDiscoveryScreenState extends State<TourDiscoveryScreen> {
     }
     _commandCount++;
 
-    if (command.startsWith('find_tours')) {
-      await _handleFindToursCommand();
-    } else if (command.startsWith('start_tour:')) {
+    // Handle global tour commands
+    if (command.startsWith('start_tour:')) {
       String tourName = command.split(':').last;
       await _handleStartTourCommand(tourName);
+    } else if (command.startsWith('select_tour:')) {
+      String tourNumber = command.split(':').last;
+      int index = int.tryParse(tourNumber) ?? 1;
+      _startTourByNumber(index - 1);
+    } else if (command == 'pause_tour') {
+      await _audioManagerService.stopAllAudio();
+      await _audioManagerService.speakIfActive(
+        'discover',
+        "Tour paused. Say 'resume tour' to continue.",
+      );
+    } else if (command == 'resume_tour') {
+      await _speakAvailableTours();
+    } else if (command == 'next_tour') {
+      await _nextTour();
+    } else if (command == 'previous_tour') {
+      await _previousTour();
+    } else if (command.startsWith('find_tours')) {
+      await _handleFindToursCommand();
     } else if (command.startsWith('describe_tour:')) {
       String tourName = command.split(':').last;
       await _handleDescribeTourCommand(tourName);
@@ -1168,16 +1185,44 @@ class _TourDiscoveryScreenState extends State<TourDiscoveryScreen> {
                                               ],
                                             ),
                                             trailing: ElevatedButton(
-                                              onPressed:
-                                                  () =>
-                                                      _startTour(tour['name']),
+                                              onPressed: () async {
+                                                // Haptic feedback and vibration
+                                                try {
+                                                  if (await Vibration.hasVibrator()) {
+                                                    Vibration.vibrate(
+                                                      duration: 80,
+                                                    );
+                                                  }
+                                                } catch (e) {
+                                                  // Ignore vibration errors
+                                                }
+                                                // Stop any ongoing TTS
+                                                await tts.stop();
+                                                // Start the tour
+                                                await _startTour(tour['name']);
+                                              },
                                               child: Text('Start'),
                                               style: ElevatedButton.styleFrom(
                                                 backgroundColor: Colors.green,
                                                 foregroundColor: Colors.white,
                                               ),
                                             ),
-                                            onTap: () => _showTourDetails(),
+                                            onTap: () async {
+                                              // Haptic feedback and vibration
+                                              try {
+                                                if (await Vibration.hasVibrator()) {
+                                                  Vibration.vibrate(
+                                                    duration: 60,
+                                                  );
+                                                }
+                                              } catch (e) {
+                                                // Ignore vibration errors
+                                              }
+                                              // Stop any ongoing TTS
+                                              await tts.stop();
+                                              // Show tour details
+                                              await _showTourDetails();
+                                            },
                                           ),
                                         );
                                       },
@@ -1207,8 +1252,14 @@ class _TourDiscoveryScreenState extends State<TourDiscoveryScreen> {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  "Say 'one' through 'four' for tours • 'find tours' to search • 'next' for next tour • 'previous' for previous tour • 'stop talking' to pause • 'resume talking' to continue • 'go back' to return",
+                  "Say 'one' through 'four' for tours • 'start tour' to begin • 'pause tour' to stop • 'resume tour' to continue • 'next' for next tour • 'previous' for previous tour • 'find tours' to search • 'go back' to return",
                   style: TextStyle(color: Colors.white70, fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 4),
+                Text(
+                  "Global commands work from any screen: 'start tour [name]', 'select tour [number]', 'pause tour', 'resume tour', 'next tour', 'previous tour', 'find tours'",
+                  style: TextStyle(color: Colors.blue[300], fontSize: 11),
                   textAlign: TextAlign.center,
                 ),
               ],

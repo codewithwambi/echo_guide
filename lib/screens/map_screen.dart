@@ -1881,15 +1881,42 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  void _onCategorySelected(String category) {
+  Future<void> _onCategorySelected(String category) async {
+    // Haptic feedback for category selection
+    try {
+      if (await Vibration.hasVibrator()) {
+        Vibration.vibrate(duration: 45);
+      }
+    } catch (e) {
+      debugPrint('Vibration error: $e');
+    }
+
     setState(() {
       _selectedCategory = category;
       _showCategorySelector = false;
     });
+
+    if (_isVoiceEnabled) {
+      String categoryName = _getCategoryDisplayName(category);
+      await _audioManagerService.speakIfActive(
+        'map',
+        'Searching for nearby $categoryName. Please wait while I discover locations for you.',
+      );
+    }
+
     _loadNearbyPlaces();
   }
 
-  void _toggleCategorySelector() {
+  Future<void> _toggleCategorySelector() async {
+    // Haptic feedback for category selector toggle
+    try {
+      if (await Vibration.hasVibrator()) {
+        Vibration.vibrate(duration: 35);
+      }
+    } catch (e) {
+      debugPrint('Vibration error: $e');
+    }
+
     setState(() {
       _showCategorySelector = !_showCategorySelector;
       if (_showCategorySelector) {
@@ -1898,13 +1925,32 @@ class _MapScreenState extends State<MapScreen> {
     });
 
     if (_showCategorySelector) {
-      _ttsService.speakWithPriority(
-        'Category selector opened. Choose a place type to search for.',
-      );
+      if (_isVoiceEnabled) {
+        await _audioManagerService.speakIfActive(
+          'map',
+          'Category selector opened. Choose a place type to search for nearby locations.',
+        );
+      }
+    } else {
+      if (_isVoiceEnabled) {
+        await _audioManagerService.speakIfActive(
+          'map',
+          'Category selector closed.',
+        );
+      }
     }
   }
 
-  void _toggleNearbyPlaces() {
+  Future<void> _toggleNearbyPlaces() async {
+    // Haptic feedback for nearby places toggle
+    try {
+      if (await Vibration.hasVibrator()) {
+        Vibration.vibrate(duration: 35);
+      }
+    } catch (e) {
+      debugPrint('Vibration error: $e');
+    }
+
     setState(() {
       _showNearbyPlaces = !_showNearbyPlaces;
       if (_showNearbyPlaces) {
@@ -1913,40 +1959,183 @@ class _MapScreenState extends State<MapScreen> {
     });
 
     if (_showNearbyPlaces) {
-      _ttsService.speakWithPriority(
-        'Nearby places panel opened. Browse discovered locations.',
+      if (_isVoiceEnabled) {
+        await _audioManagerService.speakIfActive(
+          'map',
+          'Nearby places panel opened. Browse discovered locations and tap on any place for details.',
+        );
+      }
+    } else {
+      if (_isVoiceEnabled) {
+        await _audioManagerService.speakIfActive(
+          'map',
+          'Nearby places panel closed.',
+        );
+      }
+    }
+  }
+
+  Future<void> _onPlaceSelected(NearbyPlace place) async {
+    // Enhanced haptic feedback for place selection
+    try {
+      if (await Vibration.hasVibrator()) {
+        // Triple vibration pattern for place selection (different from landmarks)
+        Vibration.vibrate(duration: 150);
+        await Future.delayed(const Duration(milliseconds: 80));
+        Vibration.vibrate(duration: 100);
+        await Future.delayed(const Duration(milliseconds: 80));
+        Vibration.vibrate(duration: 100);
+      }
+    } catch (e) {
+      debugPrint('Vibration error: $e');
+    }
+
+    // Enhanced speech narration for place selection
+    if (_isVoiceEnabled) {
+      String placeDescription = "Place selected: ${place.name}. ";
+
+      // Add category information
+      String categoryDesc = _getCategoryDisplayName(place.category);
+      placeDescription += "This is a $categoryDesc. ";
+
+      // Add distance information if position is available
+      if (_currentPosition != null) {
+        double distance = _calculateDistance(
+          _currentPosition!.latitude,
+          _currentPosition!.longitude,
+          place.latitude,
+          place.longitude,
+        );
+        String distanceDesc = _getDistanceDescription(distance);
+        placeDescription +=
+            "It's located $distanceDesc from your current location. ";
+      }
+
+      // Add address information
+      if (place.address != null && place.address!.isNotEmpty) {
+        placeDescription += "Address: ${place.address}. ";
+      }
+
+      // Add rating information if available
+      if (place.rating != null) {
+        placeDescription += "Rating: ${place.rating} out of 5 stars. ";
+      }
+
+      // Add action suggestions
+      placeDescription +=
+          "Say 'navigate to ${place.name}' for turn-by-turn directions, 'call ${place.name}' for contact information, or 'tell me more' for additional details.";
+
+      await _audioManagerService.speakIfActive('map', placeDescription);
+    }
+  }
+
+  // Handle map tap events with haptic feedback and speech narration
+  Future<void> _onMapTapped(LatLng position) async {
+    // Light haptic feedback for map tap
+    try {
+      if (await Vibration.hasVibrator()) {
+        Vibration.vibrate(duration: 50);
+      }
+    } catch (e) {
+      debugPrint('Vibration error: $e');
+    }
+
+    // Speech narration for map tap
+    if (_isVoiceEnabled) {
+      String tapDescription = "Map tapped at coordinates ";
+      tapDescription += "${position.latitude.toStringAsFixed(4)}, ";
+      tapDescription += "${position.longitude.toStringAsFixed(4)}. ";
+
+      // Add distance from current location if available
+      if (_currentPosition != null) {
+        double distance = _calculateDistance(
+          _currentPosition!.latitude,
+          _currentPosition!.longitude,
+          position.latitude,
+          position.longitude,
+        );
+        String distanceDesc = _getDistanceDescription(distance);
+        tapDescription +=
+            "This location is $distanceDesc from your current position. ";
+      }
+
+      tapDescription +=
+          "Say 'what's here' to discover nearby places, or 'navigate here' for directions to this location.";
+
+      await _audioManagerService.speakIfActive('map', tapDescription);
+    }
+  }
+
+  Future<void> _zoomIn() async {
+    // Haptic feedback for zoom in
+    try {
+      if (await Vibration.hasVibrator()) {
+        Vibration.vibrate(duration: 30);
+      }
+    } catch (e) {
+      debugPrint('Vibration error: $e');
+    }
+
+    _mapController?.animateCamera(CameraUpdate.zoomIn());
+
+    if (_isVoiceEnabled) {
+      await _audioManagerService.speakIfActive(
+        'map',
+        'Zooming in on map for closer view',
       );
     }
   }
 
-  void _onPlaceSelected(NearbyPlace place) {
-    _ttsService.speakWithPriority(
-      'Place selected: ${place.name}. Navigation features coming soon.',
-    );
-  }
+  Future<void> _zoomOut() async {
+    // Haptic feedback for zoom out
+    try {
+      if (await Vibration.hasVibrator()) {
+        Vibration.vibrate(duration: 30);
+      }
+    } catch (e) {
+      debugPrint('Vibration error: $e');
+    }
 
-  void _zoomIn() {
-    _mapController?.animateCamera(CameraUpdate.zoomIn());
-    _ttsService.speakWithPriority('Zooming in on map');
-  }
-
-  void _zoomOut() {
     _mapController?.animateCamera(CameraUpdate.zoomOut());
-    _ttsService.speakWithPriority('Zooming out on map');
+
+    if (_isVoiceEnabled) {
+      await _audioManagerService.speakIfActive(
+        'map',
+        'Zooming out on map for wider view',
+      );
+    }
   }
 
-  void _goToCurrentLocation() {
+  Future<void> _goToCurrentLocation() async {
+    // Haptic feedback for current location
+    try {
+      if (await Vibration.hasVibrator()) {
+        Vibration.vibrate(duration: 40);
+      }
+    } catch (e) {
+      debugPrint('Vibration error: $e');
+    }
+
     if (_currentPosition != null) {
       _mapController?.animateCamera(
         CameraUpdate.newLatLng(
           LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
         ),
       );
-      _ttsService.speakWithPriority('Showing your current location on the map');
+
+      if (_isVoiceEnabled) {
+        await _audioManagerService.speakIfActive(
+          'map',
+          'Centering map on your current location',
+        );
+      }
     } else {
-      _ttsService.speakWithPriority(
-        'Current location not available. Please enable location services.',
-      );
+      if (_isVoiceEnabled) {
+        await _audioManagerService.speakIfActive(
+          'map',
+          'Current location not available. Please enable location services.',
+        );
+      }
     }
   }
 
@@ -2141,28 +2330,75 @@ class _MapScreenState extends State<MapScreen> {
 
     debugPrint('🎤 Map voice command received: $command');
 
-    // Enhanced blind user specific commands
+    // Enhanced surroundings narration commands
     if (command.contains('describe surroundings') ||
         command.contains('immersive description') ||
-        command.contains('detailed surroundings')) {
+        command.contains('detailed surroundings') ||
+        command.contains('tell me about surroundings') ||
+        command.contains('describe area') ||
+        command.contains('what is around me') ||
+        command.contains('describe environment')) {
       await _narrateImmersiveSurroundings();
+    }
+    // Handle comprehensive surroundings commands
+    else if (command.contains('surroundings') ||
+        command.contains('around me') ||
+        command.contains('what\'s nearby') ||
+        command.contains('nearby places') ||
+        command.contains('what\'s around') ||
+        command.contains('tell me surroundings') ||
+        command.contains('describe nearby') ||
+        command.contains('what\'s here') ||
+        command.contains('explore area') ||
+        command.contains('discover surroundings') ||
+        command.contains('scan area') ||
+        command.contains('survey surroundings')) {
+      await _narrateSurroundings();
+    }
+    // Handle spatial awareness and location commands
+    else if (command.contains('where am i') ||
+        command.contains('my position') ||
+        command.contains('current coordinates') ||
+        command.contains('my location') ||
+        command.contains('current location') ||
+        command.contains('where am i located') ||
+        command.contains('what is my position') ||
+        command.contains('tell me my location')) {
+      await _narrateCurrentPosition();
     }
     // Handle navigation assistance for blind users
     else if (command.startsWith('navigate to ') ||
         command.startsWith('go to ') ||
-        command.startsWith('take me to ')) {
+        command.startsWith('take me to ') ||
+        command.startsWith('guide me to ') ||
+        command.startsWith('direct me to ') ||
+        command.startsWith('route to ')) {
       String destination =
           command
               .replaceAll('navigate to ', '')
               .replaceAll('go to ', '')
               .replaceAll('take me to ', '')
+              .replaceAll('guide me to ', '')
+              .replaceAll('direct me to ', '')
+              .replaceAll('route to ', '')
               .trim();
       await _provideNavigationAssistance(destination);
+    }
+    // Handle recently narrated places
+    else if (command.contains('recent places') ||
+        command.contains('last mentioned') ||
+        command.contains('recently narrated') ||
+        command.contains('what did you mention') ||
+        command.contains('previous places') ||
+        command.contains('last places')) {
+      await _narrateRecentPlaces();
     }
     // Handle narration mode changes
     else if (command.contains('change narration mode') ||
         command.contains('switch narration') ||
-        command.contains('toggle narration')) {
+        command.contains('toggle narration') ||
+        command.contains('change mode') ||
+        command.contains('switch mode')) {
       _toggleNarrationMode();
       String mode = _mapNarrationService.getCurrentNarrationMode();
       await _audioManagerService.speakIfActive(
@@ -2172,35 +2408,35 @@ class _MapScreenState extends State<MapScreen> {
     }
     // Handle speed adjustments
     else if (command.contains('speak faster') ||
-        command.contains('increase speed')) {
+        command.contains('increase speed') ||
+        command.contains('speed up') ||
+        command.contains('talk faster')) {
       double currentSpeed = _mapNarrationService.getNarrationSpeed();
       _mapNarrationService.adjustNarrationSpeed(currentSpeed + 0.1);
       await _audioManagerService.speakIfActive('map', 'Speech speed increased');
     } else if (command.contains('speak slower') ||
-        command.contains('decrease speed')) {
+        command.contains('decrease speed') ||
+        command.contains('slow down') ||
+        command.contains('talk slower')) {
       double currentSpeed = _mapNarrationService.getNarrationSpeed();
       _mapNarrationService.adjustNarrationSpeed(currentSpeed - 0.1);
       await _audioManagerService.speakIfActive('map', 'Speech speed decreased');
     }
-    // Handle spatial awareness commands
-    else if (command.contains('where am i') ||
-        command.contains('my position') ||
-        command.contains('current coordinates')) {
-      await _narrateCurrentPosition();
-    }
-    // Handle recently narrated places
-    else if (command.contains('recent places') ||
-        command.contains('last mentioned') ||
-        command.contains('recently narrated')) {
-      await _narrateRecentPlaces();
-    }
-    // Handle surroundings and general area commands
-    else if (command.contains('surroundings') ||
-        command.contains('around me') ||
-        command.contains('what\'s nearby') ||
-        command.contains('nearby places') ||
-        command.contains('what\'s around')) {
-      await _narrateSurroundings();
+    // Handle distance-based surroundings commands
+    else if (command.contains('near surroundings') ||
+        command.contains('close surroundings') ||
+        command.contains('nearby area') ||
+        command.contains('immediate surroundings')) {
+      await _narrateSurroundingsByDistance('near');
+    } else if (command.contains('medium surroundings') ||
+        command.contains('moderate surroundings') ||
+        command.contains('medium distance')) {
+      await _narrateSurroundingsByDistance('medium');
+    } else if (command.contains('far surroundings') ||
+        command.contains('distant surroundings') ||
+        command.contains('extended area') ||
+        command.contains('wider area')) {
+      await _narrateSurroundingsByDistance('far');
     }
     // Handle specific category commands
     else if (command.contains('restaurant') ||
@@ -2271,6 +2507,23 @@ class _MapScreenState extends State<MapScreen> {
         command.contains('amenities')) {
       await _narrateShoppingAndServices();
     }
+    // Handle specific surroundings exploration commands
+    else if (command.contains('what\'s here') ||
+        command.contains('explore here') ||
+        command.contains('discover here') ||
+        command.contains('scan here')) {
+      await _narrateSurroundingsByDistance('near');
+    } else if (command.contains('explore nearby') ||
+        command.contains('discover nearby') ||
+        command.contains('scan nearby') ||
+        command.contains('survey nearby')) {
+      await _narrateSurroundingsByDistance('medium');
+    } else if (command.contains('explore area') ||
+        command.contains('discover area') ||
+        command.contains('scan area') ||
+        command.contains('survey area')) {
+      await _narrateSurroundings();
+    }
     // Handle map control commands
     else if (command.contains('zoom in') ||
         command.contains('closer') ||
@@ -2298,12 +2551,58 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  // Narrate surroundings using the map narration service
+  // Enhanced surroundings narration with comprehensive voice commands
   Future<void> _narrateSurroundings() async {
     if (_currentPosition != null) {
+      // Provide immediate feedback
+      await _audioManagerService.speakIfActive(
+        'map',
+        'Exploring your surroundings. Discovering nearby places and landmarks...',
+      );
+
       await _mapNarrationService.narrateSurroundings(
         latitude: _currentPosition!.latitude,
         longitude: _currentPosition!.longitude,
+      );
+    } else {
+      await _audioManagerService.speakIfActive(
+        'map',
+        'Location not available. Please enable location services to explore your surroundings.',
+      );
+    }
+  }
+
+  // Narrate surroundings by distance (near, medium, far)
+  Future<void> _narrateSurroundingsByDistance(String distance) async {
+    if (_currentPosition != null) {
+      double radius = 500; // Default medium distance
+
+      switch (distance.toLowerCase()) {
+        case 'near':
+        case 'close':
+        case 'nearby':
+          radius = 200;
+          break;
+        case 'medium':
+        case 'moderate':
+          radius = 500;
+          break;
+        case 'far':
+        case 'distant':
+        case 'extended':
+          radius = 1000;
+          break;
+      }
+
+      await _audioManagerService.speakIfActive(
+        'map',
+        'Exploring $distance surroundings within ${radius.toStringAsFixed(0)} meters...',
+      );
+
+      await _mapNarrationService.narrateSurroundings(
+        latitude: _currentPosition!.latitude,
+        longitude: _currentPosition!.longitude,
+        radius: radius,
       );
     } else {
       await _audioManagerService.speakIfActive(
@@ -2374,22 +2673,53 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  // Provide map help with available categories
+  // Enhanced map help with comprehensive voice commands
   Future<void> _provideMapHelp() async {
-    String helpMessage = _mapNarrationService.getCategorySuggestions();
+    String helpMessage = 'Here are the voice commands you can use: ';
+
+    // Surroundings commands
     helpMessage +=
-        ' You can also say "surroundings" for an overview, "emergency" for safety services, "transportation" for travel options, or "shopping" for amenities. ';
-    helpMessage += 'Map controls: "zoom in", "zoom out", "my location".';
+        'For surroundings exploration: "surroundings", "describe surroundings", "what\'s around me", "explore area", "scan area", "survey surroundings". ';
+
+    // Distance-based commands
+    helpMessage +=
+        'For specific distances: "near surroundings", "medium surroundings", "far surroundings", "close area", "extended area". ';
+
+    // Location commands
+    helpMessage +=
+        'For location: "where am i", "my position", "current location", "tell me my location". ';
+
+    // Navigation commands
+    helpMessage +=
+        'For navigation: "navigate to [place name]", "go to [place name]", "guide me to [place name]", "route to [place name]". ';
+
+    // Category commands
+    helpMessage +=
+        'For specific categories: "restaurants", "hotels", "hospitals", "banks", "shopping", "transportation", "emergency services". ';
+
+    // Control commands
+    helpMessage += 'For map controls: "zoom in", "zoom out", "my location". ';
+
+    // Settings commands
+    helpMessage +=
+        'For settings: "change narration mode", "speak faster", "speak slower", "recent places". ';
+
+    helpMessage +=
+        'Say any of these commands to get started with exploring your surroundings!';
 
     await _audioManagerService.speakIfActive('map', helpMessage);
   }
 
-  // Provide default response for unknown commands
+  // Enhanced default response for unknown commands
   Future<void> _provideMapDefaultResponse() async {
     String response = "I didn't understand that command. ";
     response +=
-        "Say 'surroundings' to hear what's around you, or try a specific category like 'restaurants', 'hotels', 'hospitals', 'banks', or 'shopping'. ";
-    response += "Say 'help' for all available options.";
+        "Try saying 'surroundings' to explore what's around you, 'describe surroundings' for detailed information, or 'what's around me' for an overview. ";
+    response +=
+        "You can also ask for specific categories like 'restaurants', 'hotels', 'hospitals', 'banks', or 'shopping'. ";
+    response +=
+        "For navigation, say 'navigate to [place name]'. For your location, say 'where am i'. ";
+    response += "Say 'help' for a complete list of available voice commands.";
 
     await _audioManagerService.speakIfActive('map', response);
   }
@@ -2512,6 +2842,19 @@ class _MapScreenState extends State<MapScreen> {
     return degrees * (3.14159 / 180);
   }
 
+  // Get human-readable distance description
+  String _getDistanceDescription(double distanceInMeters) {
+    if (distanceInMeters < 50) {
+      return 'very close, about ${distanceInMeters.toStringAsFixed(0)} meters';
+    } else if (distanceInMeters < 200) {
+      return 'nearby, about ${distanceInMeters.toStringAsFixed(0)} meters';
+    } else if (distanceInMeters < 500) {
+      return 'a short walk away, about ${(distanceInMeters / 100).toStringAsFixed(1)} blocks';
+    } else {
+      return 'about ${(distanceInMeters / 1000).toStringAsFixed(1)} kilometers away';
+    }
+  }
+
   void _onNearbyLandmarksUpdate(List<Landmark> landmarks) {
     if (mounted) {
       setState(() {
@@ -2539,15 +2882,43 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _onLandmarkTapped(Landmark landmark) async {
+    // Enhanced haptic feedback for landmark selection
+    try {
+      if (await Vibration.hasVibrator()) {
+        // Double vibration pattern for landmark selection
+        Vibration.vibrate(duration: 200);
+        await Future.delayed(const Duration(milliseconds: 100));
+        Vibration.vibrate(duration: 150);
+      }
+    } catch (e) {
+      debugPrint('Vibration error: $e');
+    }
+
+    // Enhanced speech narration for landmark selection
     if (_isVoiceEnabled) {
-      String landmarkDescription = "${landmark.name}. ${landmark.description}";
+      String landmarkDescription = "Landmark selected: ${landmark.name}. ";
+      landmarkDescription += "${landmark.description}. ";
+
+      // Add distance information if position is available
+      if (_currentPosition != null) {
+        double distance = _calculateDistance(
+          _currentPosition!.latitude,
+          _currentPosition!.longitude,
+          landmark.latitude,
+          landmark.longitude,
+        );
+        String distanceDesc = _getDistanceDescription(distance);
+        landmarkDescription +=
+            "This landmark is $distanceDesc away from your current location. ";
+      }
+
+      landmarkDescription +=
+          "Say 'navigate to ${landmark.name}' to start turn-by-turn directions, or 'tell me more' for additional information.";
+
       await _audioManagerService.speakIfActive('map', landmarkDescription);
     }
 
-    if (await Vibration.hasVibrator()) {
-      Vibration.vibrate(duration: 300);
-    }
-
+    // Start navigation assistance
     await _startNavigationTo(landmark);
   }
 
@@ -2715,6 +3086,7 @@ class _MapScreenState extends State<MapScreen> {
             onMapCreated: (GoogleMapController controller) {
               _mapController = controller;
             },
+            onTap: (LatLng position) => _onMapTapped(position),
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,

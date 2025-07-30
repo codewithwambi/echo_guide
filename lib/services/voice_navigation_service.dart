@@ -44,6 +44,8 @@ class VoiceNavigationService {
       StreamController<String>.broadcast();
   final StreamController<String> _helpCommandController =
       StreamController<String>.broadcast();
+  final StreamController<String> _surroundingsCommandController =
+      StreamController<String>.broadcast();
   final StreamController<String> _voiceStatusController =
       StreamController<String>.broadcast();
 
@@ -58,6 +60,8 @@ class VoiceNavigationService {
   Stream<String> get downloadsCommandStream =>
       _downloadsCommandController.stream;
   Stream<String> get helpCommandStream => _helpCommandController.stream;
+  Stream<String> get surroundingsCommandStream =>
+      _surroundingsCommandController.stream;
   Stream<String> get voiceStatusStream => _voiceStatusController.stream;
 
   // Enhanced navigation command patterns for seamless navigation from any screen
@@ -694,14 +698,216 @@ class VoiceNavigationService {
     ],
     'discover_place_exploration_mode': [
       'place exploration mode',
-      'place mode',
-      'location exploration mode',
-      'location mode',
-      'area exploration mode',
-      'area mode',
-      'place discovery mode',
-      'location discovery mode',
-      'area discovery mode',
+      'exploration mode',
+      'place search mode',
+      'place browse mode',
+      'place finder mode',
+    ],
+    // Global tour discovery commands - accessible from any screen
+    'global_start_tour': [
+      'start tour',
+      'begin tour',
+      'play tour',
+      'start audio tour',
+      'begin audio tour',
+      'start guided tour',
+      'begin guided tour',
+      'start audio guide',
+      'begin audio guide',
+      'start guide',
+      'begin guide',
+      'start narration',
+      'begin narration',
+      'start audio',
+      'begin audio',
+      'start playing',
+      'begin playing',
+      'listen to tour',
+      'play audio tour',
+      'listen to audio tour',
+      'play guided tour',
+      'listen to guided tour',
+      'play audio guide',
+      'listen to audio guide',
+      'play guide',
+      'listen to guide',
+      'play narration',
+      'listen to narration',
+      'play audio',
+      'listen to audio',
+      'play',
+      'start',
+      'begin',
+      'listen',
+    ],
+    'global_select_tour': [
+      'select tour',
+      'choose tour',
+      'pick tour',
+      'tour one',
+      'tour two',
+      'tour three',
+      'tour four',
+      'first tour',
+      'second tour',
+      'third tour',
+      'fourth tour',
+      'one',
+      'two',
+      'three',
+      'four',
+      'first',
+      'second',
+      'third',
+      'fourth',
+      'select first tour',
+      'select second tour',
+      'select third tour',
+      'select fourth tour',
+      'choose first tour',
+      'choose second tour',
+      'choose third tour',
+      'choose fourth tour',
+      'pick first tour',
+      'pick second tour',
+      'pick third tour',
+      'pick fourth tour',
+    ],
+    'global_pause_tour': [
+      'pause tour',
+      'stop tour',
+      'pause audio tour',
+      'stop audio tour',
+      'pause guided tour',
+      'stop guided tour',
+      'pause audio guide',
+      'stop audio guide',
+      'pause guide',
+      'stop guide',
+      'pause narration',
+      'stop narration',
+      'pause audio',
+      'stop audio',
+      'pause playing',
+      'stop playing',
+      'pause',
+      'stop',
+      'halt',
+      'pause tour now',
+      'stop tour now',
+      'pause audio now',
+      'stop audio now',
+      'pause guide now',
+      'stop guide now',
+      'pause narration now',
+      'stop narration now',
+    ],
+    'global_resume_tour': [
+      'resume tour',
+      'continue tour',
+      'resume audio tour',
+      'continue audio tour',
+      'resume guided tour',
+      'continue guided tour',
+      'resume audio guide',
+      'continue audio guide',
+      'resume guide',
+      'continue guide',
+      'resume narration',
+      'continue narration',
+      'resume audio',
+      'continue audio',
+      'resume playing',
+      'continue playing',
+      'resume',
+      'continue',
+      'unpause',
+      'resume tour now',
+      'continue tour now',
+      'resume audio now',
+      'continue audio now',
+      'resume guide now',
+      'continue guide now',
+      'resume narration now',
+      'continue narration now',
+    ],
+    'global_next_tour': [
+      'next tour',
+      'next',
+      'next audio tour',
+      'next guided tour',
+      'next audio guide',
+      'next guide',
+      'next narration',
+      'next audio',
+      'next playing',
+      'skip to next tour',
+      'go to next tour',
+      'move to next tour',
+      'switch to next tour',
+      'change to next tour',
+      'next tour please',
+      'skip tour',
+      'skip',
+      'skip to next',
+      'go to next',
+      'move to next',
+      'switch to next',
+      'change to next',
+    ],
+    'global_previous_tour': [
+      'previous tour',
+      'previous',
+      'previous audio tour',
+      'previous guided tour',
+      'previous audio guide',
+      'previous guide',
+      'previous narration',
+      'previous audio',
+      'previous playing',
+      'skip to previous tour',
+      'go to previous tour',
+      'move to previous tour',
+      'switch to previous tour',
+      'change to previous tour',
+      'previous tour please',
+      'go back tour',
+      'back tour',
+      'go back to previous tour',
+      'back to previous tour',
+      'return to previous tour',
+      'last tour',
+      'go to last tour',
+      'move to last tour',
+      'switch to last tour',
+      'change to last tour',
+    ],
+    'global_find_tours': [
+      'find tours',
+      'discover tours',
+      'show tours',
+      'available tours',
+      'nearby tours',
+      'what tours',
+      'find available tours',
+      'list tours',
+      'show available tours',
+      'what tours are available',
+      'find nearby tours',
+      'discover available tours',
+      'show nearby tours',
+      'list available tours',
+      'what tours can i take',
+      'find tours near me',
+      'show tours near me',
+      'discover tours near me',
+      'search tours',
+      'browse tours',
+      'explore tours',
+      'tour discovery',
+      'tour search',
+      'tour browse',
+      'tour explore',
     ],
     'discover_detailed_info': [
       'detailed information',
@@ -1339,6 +1545,54 @@ class VoiceNavigationService {
       'place facts',
       'place info',
     ],
+    'global_surroundings': [
+      // General surroundings
+      'surroundings',
+      'around me',
+      "what's nearby",
+      'nearby places',
+      "what's around",
+      'tell me surroundings',
+      'describe nearby',
+      "what's here",
+      'explore area',
+      'discover surroundings',
+      'scan area',
+      'survey surroundings',
+      // Detailed surroundings
+      'describe surroundings',
+      'immersive description',
+      'detailed surroundings',
+      'tell me about surroundings',
+      'describe area',
+      'what is around me',
+      'describe environment',
+      // Distance-based
+      'near surroundings',
+      'close surroundings',
+      'nearby area',
+      'immediate surroundings',
+      'medium surroundings',
+      'moderate surroundings',
+      'medium distance',
+      'far surroundings',
+      'distant surroundings',
+      'extended area',
+      'wider area',
+      // Specific exploration
+      "what's here",
+      'explore here',
+      'discover here',
+      'scan here',
+      'explore nearby',
+      'discover nearby',
+      'scan nearby',
+      'survey nearby',
+      'explore area',
+      'discover area',
+      'scan area',
+      'survey area',
+    ],
   };
 
   // Map-specific command patterns
@@ -1693,6 +1947,60 @@ class VoiceNavigationService {
         }
       }
 
+      // Check for global surroundings narration commands
+      if (_matchesPattern(
+        command,
+        _navigationPatterns['global_surroundings']!,
+      )) {
+        _surroundingsCommandController.add(command);
+        return;
+      }
+
+      // Check for global tour discovery commands - accessible from any screen
+      if (_matchesPattern(command, _navigationPatterns['global_start_tour']!)) {
+        await _handleGlobalStartTour(command);
+        return;
+      }
+
+      if (_matchesPattern(
+        command,
+        _navigationPatterns['global_select_tour']!,
+      )) {
+        await _handleGlobalSelectTour(command);
+        return;
+      }
+
+      if (_matchesPattern(command, _navigationPatterns['global_pause_tour']!)) {
+        await _handleGlobalPauseTour(command);
+        return;
+      }
+
+      if (_matchesPattern(
+        command,
+        _navigationPatterns['global_resume_tour']!,
+      )) {
+        await _handleGlobalResumeTour(command);
+        return;
+      }
+
+      if (_matchesPattern(command, _navigationPatterns['global_next_tour']!)) {
+        await _handleGlobalNextTour(command);
+        return;
+      }
+
+      if (_matchesPattern(
+        command,
+        _navigationPatterns['global_previous_tour']!,
+      )) {
+        await _handleGlobalPreviousTour(command);
+        return;
+      }
+
+      if (_matchesPattern(command, _navigationPatterns['global_find_tours']!)) {
+        await _handleGlobalFindTours(command);
+        return;
+      }
+
       // Route to screen-specific command streams for unhandled commands
       await _routeToScreenSpecificCommand(command);
 
@@ -1880,7 +2188,7 @@ class VoiceNavigationService {
       _navigationCommandController.add('describe_tour:$tourName');
     } else {
       await _narrateForCurrentScreen(
-        "Please specify which tour you want me to describe. Say 'describe tour' followed by the tour name.",
+        "Please specify which tour you want to know about. Say 'describe tour' followed by the tour name.",
         interrupt: true,
       );
     }
@@ -3016,6 +3324,145 @@ class VoiceNavigationService {
       interrupt: true,
     );
     _mapCommandController.add('center');
+  }
+
+  // Global tour discovery command handlers - accessible from any screen
+  Future<void> _handleGlobalStartTour(String command) async {
+    // Extract tour name from command
+    String tourName = '';
+    if (command.contains('start tour')) {
+      tourName = command.split('start tour').last.trim();
+    } else if (command.contains('begin tour')) {
+      tourName = command.split('begin tour').last.trim();
+    } else if (command.contains('play tour')) {
+      tourName = command.split('play tour').last.trim();
+    } else if (command.contains('listen to tour')) {
+      tourName = command.split('listen to tour').last.trim();
+    } else if (command.contains('play')) {
+      tourName = command.split('play').last.trim();
+    } else if (command.contains('start')) {
+      tourName = command.split('start').last.trim();
+    } else if (command.contains('begin')) {
+      tourName = command.split('begin').last.trim();
+    } else if (command.contains('listen')) {
+      tourName = command.split('listen').last.trim();
+    }
+
+    if (tourName.isNotEmpty) {
+      await _narrateForCurrentScreen(
+        "Starting tour: $tourName. Navigating to tour discovery to begin your adventure.",
+        interrupt: true,
+      );
+      // Navigate to discover screen and start the tour
+      await _navigateToScreen(
+        'discover',
+        _transitionManager.currentScreen ?? 'home',
+      );
+      _discoverCommandController.add('start_tour:$tourName');
+    } else {
+      await _narrateForCurrentScreen(
+        "Please specify which tour you want to start. Say 'start tour' followed by the tour name, or navigate to tour discovery to see available tours.",
+        interrupt: true,
+      );
+    }
+  }
+
+  Future<void> _handleGlobalSelectTour(String command) async {
+    String tourNumber = '';
+    if (command.contains('one') ||
+        command.contains('1') ||
+        command.contains('first')) {
+      tourNumber = '1';
+    } else if (command.contains('two') ||
+        command.contains('2') ||
+        command.contains('second')) {
+      tourNumber = '2';
+    } else if (command.contains('three') ||
+        command.contains('3') ||
+        command.contains('third')) {
+      tourNumber = '3';
+    } else if (command.contains('four') ||
+        command.contains('4') ||
+        command.contains('fourth')) {
+      tourNumber = '4';
+    }
+
+    if (tourNumber.isNotEmpty) {
+      await _narrateForCurrentScreen(
+        "Selecting tour $tourNumber. Navigating to tour discovery to show you the details.",
+        interrupt: true,
+      );
+      // Navigate to discover screen and select the tour
+      await _navigateToScreen(
+        'discover',
+        _transitionManager.currentScreen ?? 'home',
+      );
+      _discoverCommandController.add('select_tour:$tourNumber');
+    } else {
+      await _narrateForCurrentScreen(
+        "Please specify which tour you want to select. Say 'one', 'two', 'three', or 'four', or navigate to tour discovery to see available tours.",
+        interrupt: true,
+      );
+    }
+  }
+
+  Future<void> _handleGlobalPauseTour(String command) async {
+    await _narrateForCurrentScreen(
+      "Pausing tour playback. You can resume anytime by saying 'resume tour' or 'continue tour'.",
+      interrupt: true,
+    );
+    // Send pause command to all relevant screens
+    _discoverCommandController.add('pause_tour');
+    _downloadsCommandController.add('pause_tour');
+  }
+
+  Future<void> _handleGlobalResumeTour(String command) async {
+    await _narrateForCurrentScreen(
+      "Resuming tour playback. Enjoy your adventure!",
+      interrupt: true,
+    );
+    // Send resume command to all relevant screens
+    _discoverCommandController.add('resume_tour');
+    _downloadsCommandController.add('resume_tour');
+  }
+
+  Future<void> _handleGlobalNextTour(String command) async {
+    await _narrateForCurrentScreen(
+      "Moving to next tour. Navigating to tour discovery to show you the next option.",
+      interrupt: true,
+    );
+    // Navigate to discover screen and go to next tour
+    await _navigateToScreen(
+      'discover',
+      _transitionManager.currentScreen ?? 'home',
+    );
+    _discoverCommandController.add('next_tour');
+  }
+
+  Future<void> _handleGlobalPreviousTour(String command) async {
+    await _narrateForCurrentScreen(
+      "Moving to previous tour. Navigating to tour discovery to show you the previous option.",
+      interrupt: true,
+    );
+    // Navigate to discover screen and go to previous tour
+    await _navigateToScreen(
+      'discover',
+      _transitionManager.currentScreen ?? 'home',
+    );
+    _discoverCommandController.add('previous_tour');
+  }
+
+  Future<void> _handleGlobalFindTours(String command) async {
+    await _narrateForCurrentScreen(
+      "Searching for available tours near your location. Navigating to tour discovery to show you the results.",
+      interrupt: true,
+    );
+    // Navigate to discover screen and find tours
+    await _navigateToScreen(
+      'discover',
+      _transitionManager.currentScreen ?? 'home',
+    );
+    _discoverCommandController.add('find_tours');
   }
 
   Future<void> _handleMapNavigation(String command) async {

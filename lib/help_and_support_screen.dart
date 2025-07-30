@@ -6,6 +6,7 @@ import 'dart:async';
 import 'services/audio_manager_service.dart';
 import 'services/screen_transition_manager.dart';
 import 'services/voice_navigation_service.dart';
+import 'package:vibration/vibration.dart';
 
 class HelpAndSupportScreen extends StatefulWidget {
   const HelpAndSupportScreen({super.key});
@@ -760,7 +761,20 @@ class _HelpAndSupportScreenState extends State<HelpAndSupportScreen> {
                         ),
                       ],
                     ),
-                    onTap: () => _speakTopicDetails(index),
+                    onTap: () async {
+                      // Haptic feedback and vibration
+                      try {
+                        if (await Vibration.hasVibrator()) {
+                          Vibration.vibrate(duration: 60);
+                        }
+                      } catch (e) {
+                        // Ignore vibration errors
+                      }
+                      // Stop any ongoing TTS
+                      await tts.stop();
+                      // Speak topic details
+                      await _speakTopicDetails(index);
+                    },
                     trailing: Icon(Icons.help_outline, color: Colors.blue),
                   ),
                 );
